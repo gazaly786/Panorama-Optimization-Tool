@@ -11,7 +11,7 @@ import { calculateHyperfocalDistanceM } from './hyperfocal';
 import { assessDiffraction, calculateAiryDiskUm } from './diffraction';
 import { calculatePixelPitchUm } from './pixelPitch';
 import { calculatePanoramaGeometry } from './panorama';
-import { calculateExposure } from './exposure';
+import { calculateExposure, calculateBracketedFrames } from './exposure';
 
 export interface OptimizerInputs {
   camera: CameraSpec;
@@ -26,6 +26,10 @@ export interface OptimizerInputs {
   customIso?: number;
   customFocusDistanceM?: number;
   customCoCMm?: number;
+  customSceneEv?: number;
+  customAebEnabled?: boolean;
+  customAebFrames?: number;
+  customAebEvStep?: number;
 }
 
 /**
@@ -46,6 +50,7 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
   const focalLengthMm = inputs.focalLengthMm || lens.focalLengthMinMm;
   const subjectDistanceM = inputs.subjectDistanceM !== undefined ? inputs.subjectDistanceM : scenario.defaultSubjectDistanceM;
   const targetOverlap = inputs.targetOverlapPct !== undefined ? inputs.targetOverlapPct : (scenario.recommendedOverlapPct / 100);
+  const sceneEv = inputs.customSceneEv !== undefined ? inputs.customSceneEv : scenario.lightLevelEv;
 
   // 1. Circle of Confusion and Pixel Pitch
   const cocMm = getCircleOfConfusionMm(camera, customCoCMm);
@@ -58,24 +63,27 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
   if (inputs.customAperture && inputs.customAperture > 0) {
     recommendedAperture = inputs.customAperture;
   } else {
-    // For wide/fisheye lenses (<= 12mm), depth of field at f/8 is already immense (often near limit < 0.6m).
-    // f/16 causes severe diffraction on modern dense sensors (like 90D with 3.2um pixels).
-    // Therefore f/8 or f/5.6 is the optical sweet spot.
+    // For wide & fisheye lenses (e.g. 8mm, 10mm, 12mm), f/8 provides massive depth of field
+    // while keeping airy disk well within bounds. If f/8 is diffraction limited on ultra-dense APS-C,
+    // evaluate f/5.6.
     if (focalLengthMm <= 10) {
-      if (qualityPriority === 'MAXIMUM_QUALITY') {
-        recommendedAperture = 8.0; // Perfect balance of DOF + sharpness for 8mm fisheyes
-      } else if (qualityPriority === 'FAST') {
-        recommendedAperture = 5.6; // Slightly more light, faster shutter
+      const airyAtF8 = calculateAiryDiskUm(8);
+      const airyAtF56 = calculateAiryDiskUm(5.6);
+      if (airyAtF8 > pixelPitchUm * 4 && airyAtF56 <= pixelPitchUm * 3.5) {
+        recommendedAperture = 5.6;
       } else {
-        recommendedAperture = 8.0;
+        recommendedAperture = 8;
       }
-    } else if (focalLengthMm <= 18) {
-      recommendedAperture = 8.0;
+    } else if (focalLengthMm <= 16) {
+      recommendedAperture = 8;
     } else if (focalLengthMm <= 35) {
-      recommendedAperture = qualityPriority === 'MAXIMUM_QUALITY' ? 11.0 : 8.0;
+      recommendedAperture = qualityPriority === 'FAST' ? 5.6 : 8;
     } else {
-      recommendedAperture = 11.0;
+      recommendedAperture = 8;
     }
+
+    // Clamp within physical lens aperture limits
+    recommendedAperture = Math.max(lens.maxAperture, Math.min(recommendedAperture, lens.minAperture));
   }
 
   // 3. Hyperfocal and Focus Distance
@@ -119,7 +127,7 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
   const exposure = calculateExposure(
     camera,
     recommendedAperture,
-    scenario.lightLevelEv,
+    sceneEv,
     tripodOn,
     scenario.name.includes('People'),
     qualityPriority,
@@ -127,21 +135,39 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
   );
 
   // 8. HDR / AEB Strategy
-  // If scenario has windows or high contrast (Interior, Sunset, Hotel) and camera supports AEB
-  let aebRecommended = false;
-  let aebFrames = 1;
-  let aebEvStep = 2;
+  let aebRecommended = inputs.customAebEnabled !== undefined
+    ? inputs.customAebEnabled
+    : (scenario.recommendedAeb.enabled && camera.aebCapability);
 
-  if (scenario.recommendedAeb.enabled && camera.aebCapability) {
-    aebRecommended = true;
-    if (qualityPriority === 'MAXIMUM_QUALITY') {
-      aebFrames = Math.min(camera.maxAebFrameCount >= 5 ? 5 : 3, 5);
-      aebEvStep = Math.min(camera.maxAebRangeEv >= 2 ? 2 : 1, 2);
+  let aebFrames = inputs.customAebFrames !== undefined ? inputs.customAebFrames : 1;
+  let aebEvStep = inputs.customAebEvStep !== undefined ? inputs.customAebEvStep : 2;
+
+  if (inputs.customAebFrames === undefined) {
+    if (aebRecommended) {
+      if (qualityPriority === 'MAXIMUM_QUALITY') {
+        aebFrames = Math.min(camera.maxAebFrameCount >= 5 ? 5 : 3, 5);
+        aebEvStep = Math.min(camera.maxAebRangeEv >= 2 ? 2 : 1, 2);
+      } else {
+        aebFrames = 3;
+        aebEvStep = Math.min(camera.maxAebRangeEv >= 2 ? 2 : 1, 2);
+      }
     } else {
-      aebFrames = 3;
-      aebEvStep = Math.min(camera.maxAebRangeEv >= 2 ? 2 : 1, 2);
+      aebFrames = 1;
     }
   }
+
+  // Calculate bracketed frames
+  const bracketedFrames = calculateBracketedFrames(
+    exposure.shutterSeconds,
+    aebRecommended ? aebFrames : 1,
+    aebEvStep,
+    sceneEv
+  );
+
+  const bracketSpanEv = (aebRecommended && aebFrames > 1) ? (aebFrames - 1) * aebEvStep : 0;
+  const sensorDr = camera.sensorFormat === 'Full Frame' ? 14.5 : 12.8;
+  const totalDynamicRangeStops = Math.round((sensorDr + bracketSpanEv) * 10) / 10;
+  const totalRawShotsWithBracketing = panoGeo.totalShots * (aebRecommended ? aebFrames : 1);
 
   // 9. Warnings & Advisory Checks
   const warnings: string[] = [];
@@ -153,6 +179,9 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
   }
   if (focusDistanceM < H_near_m) {
     warnings.push(`Focus distance (${focusDistanceM.toFixed(2)}m) is closer than the near hyperfocal limit (${H_near_m.toFixed(2)}m). Background elements at infinity will not be critically sharp.`);
+  }
+  if (aebRecommended && aebFrames > camera.maxAebFrameCount) {
+    warnings.push(`Requested AEB (${aebFrames} frames) exceeds camera internal limit (${camera.maxAebFrameCount} frames). Manual shutter changes or an external intervalometer will be required.`);
   }
 
   // 10. Clear Explanations
@@ -178,35 +207,37 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
       alternative: `ISO 400 - 800 only if shooting handheld or if people/curtains are moving rapidly.`,
     },
     shutter: {
-      value: `${exposure.shutterSpeedFraction}`,
-      why: `Correct exposure for scene brightness (EV ${scenario.lightLevelEv}) at f/${recommendedAperture} and ISO ${exposure.iso}.`,
-      tradeOff: `Longer exposures require vibration suppression (self-timer, remote trigger, or electronic shutter).`,
-      alternative: `Increase ISO or widen aperture if subject movement causes motion blur.`,
+      value: exposure.shutterSpeedFraction,
+      why: `Derived from scene brightness (EV ${sceneEv}) and aperture f/${recommendedAperture} at ISO ${exposure.iso}.`,
+      tradeOff: `At ${exposure.shutterSpeedFraction}, handheld operation is prohibited without blur. Sturdy tripod head is mandatory.`,
+      alternative: `Increase ISO to 400 if wind or vibrating floors necessitate faster shutter.`,
     },
     shotsAndRotation: {
-      value: `${panoGeo.shotsPerCircle} shots around (${panoGeo.rotatorClickStopDeg}° detent)`,
-      why: `With an effective horizontal angle of view of ${panoGeo.effectiveHfovDeg}°, ${panoGeo.shotsPerCircle} shots yields ~${panoGeo.actualOverlapPct}% overlap, perfectly matching the ${panoGeo.rotatorClickStopDeg}° click-stop on standard panoramic rotators.`,
-      tradeOff: `Fewer shots risks stitching gaps or poor control point matching; more shots increases capture and stitching processing time.`,
-      alternative: `8 shots around (45° detent) for extra safety in texture-poor white rooms.`,
+      value: `${panoGeo.shotsPerCircle} shots @ ${panoGeo.rotatorClickStopDeg}°`,
+      why: `The effective HFOV of ${panoGeo.effectiveHfovDeg.toFixed(1)}° requires ${panoGeo.shotsPerCircle} shots around to ensure ${panoGeo.actualOverlapPct.toFixed(0)}% horizontal overlap.`,
+      tradeOff: `Fewer shots would reduce overlap below 20%, risking stitching seams failing in textureless areas. More shots increases shooting and stitching time.`,
+      alternative: `If using higher overlap for complex architecture, move to next smaller detent (e.g. ${Math.round(360 / (panoGeo.shotsPerCircle + 2))}°).`,
     },
     overlap: {
-      value: `~${panoGeo.actualOverlapPct}%`,
-      why: `Provides sufficient redundant image area for stitching algorithms (PTGui, Hugin) to identify feature keypoints and blend exposure seamlessly.`,
-      tradeOff: `Overlaps below 20% risk stitch failures on plain walls. Overlaps above 45% increase file count and processing time unnecessarily.`,
-      alternative: `35–40% if the room has blank, painted white walls or smooth ceilings.`,
+      value: `${panoGeo.actualOverlapPct.toFixed(0)}%`,
+      why: `Standard 25%-35% overlap ensures PTGui / Hugin control point detectors find matching keypoints across seams.`,
+      tradeOff: `Higher overlap (>50%) wastes time taking redundant photos. Lower overlap (<15%) risks control point starvation.`,
+      alternative: `30% is optimal for architectural interiors; 25% is sufficient for outdoor landscape horizons.`,
     },
     aeb: {
-      value: aebRecommended ? `${aebFrames} frames ±${aebEvStep} EV` : 'OFF (Single Frame RAW)',
+      value: aebRecommended ? `${aebFrames} frames @ ±${aebEvStep} EV (span: ${bracketSpanEv} EV)` : 'Single Exposure (Off)',
       why: aebRecommended
-        ? `The scene's dynamic range (e.g. windows vs dark interior corners) exceeds a single sensor exposure. Exposure bracketing captures highlight window views and deep shadows.`
-        : `Single frame RAW capture provides sufficient dynamic range under even lighting without ghosting.`,
-      tradeOff: `AEB triples file count and storage; requires HDR merging software.`,
-      alternative: `5 frames ±2 EV for high-contrast architectural exteriors with backlit windows.`,
+        ? `Expands total captured dynamic range to ~${totalDynamicRangeStops} stops, preventing blown window views and preserving shadow detail under furniture.`
+        : `Scene dynamic range is within sensor's native ~${sensorDr} EV latitude; single exposure suffices.`,
+      tradeOff: aebRecommended
+        ? `Multiplies RAW capture count (${panoGeo.totalShots} × ${aebFrames} = ${totalRawShotsWithBracketing} files) and requires HDR fusion in post-production.`
+        : `High contrast scenes will clip windows or underexpose room corners.`,
+      alternative: aebRecommended ? 'Use 3 shots ±2 EV for faster turnaround' : 'Enable 3 shots ±2 EV if window blowout is detected on histogram.',
     },
     workflow: {
-      value: 'TRIPOD + MANUAL LOCK',
-      why: `Consistent exposure, locked white balance, and locked manual focus are mandatory so adjacent tiles blend without visible exposure seams or color shifts.`,
-      tradeOff: `Requires manual setup on location; eliminates the convenience of automatic camera modes.`,
+      value: 'Full Manual Lock (M)',
+      why: `Identical exposure, focus plane, and white balance across all ${panoGeo.totalShots} tiles eliminates exposure banding and color stitching artifacts.`,
+      tradeOff: `Requires taking a test meter shot and locking manual settings before starting rotation.`,
       alternative: `None. Automatic exposure or autofocus between panorama tiles is the #1 cause of ruined panoramas.`,
     },
   };
@@ -221,10 +252,12 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
     `Focus at approx ${focusDistanceM.toFixed(1)}m using Live View 10x magnification.`,
     'Switch lens/camera focus switch to MANUAL FOCUS (MF). Tape focus ring if necessary to prevent accidental shifts.',
     camera.ibis ? 'Turn OFF In-Body Image Stabilization (IBIS) and Lens Optical Stabilization to prevent sensor drift.' : 'Ensure stabilization is off on tripod.',
-    aebRecommended ? `Enable Auto Exposure Bracketing (AEB): ${aebFrames} shots spaced ±${aebEvStep} EV.` : 'Ensure single-shot RAW capture is selected.',
+    aebRecommended && aebFrames > 1
+      ? `Enable Auto Exposure Bracketing (AEB): ${aebFrames} shots spaced ±${aebEvStep} EV (total span: ${bracketSpanEv} EV stops).`
+      : 'Ensure single-shot RAW capture is selected.',
     camera.selfTimerSeconds.includes(2) ? 'Set Self-Timer to 2 seconds or use a remote shutter release to eliminate finger vibration.' : 'Use remote trigger or cable release.',
-    `Rotate the rotator to 0° and take the first shot (or bracket sequence).`,
-    `Rotate by ${panoGeo.rotatorClickStopDeg}° for each subsequent shot around the 360° circle (total ${panoGeo.shotsPerCircle} positions).`,
+    `Rotate the rotator to 0° and take the first shot (or bracket sequence of ${aebRecommended ? aebFrames : 1} frames).`,
+    `Rotate by ${panoGeo.rotatorClickStopDeg}° for each subsequent shot around the 360° circle (total ${panoGeo.shotsPerCircle} positions, ${totalRawShotsWithBracketing} RAW files).`,
     panoGeo.zenithShotRecommended ? 'Tilt head up to +90° and take 1 Zenith shot to cap the ceiling/sky.' : 'Verify ceiling coverage in standard row.',
     panoGeo.nadirShotRecommended ? 'Tilt head down to -90° (Nadir) or step aside and shoot a handheld/offset ground patch for clean tripod removal.' : 'Verify ground coverage.',
     'Inspect histogram of first and last shot on LCD to verify no clipped highlights and consistent exposure.',
@@ -275,11 +308,15 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
     recommendedIso: exposure.iso,
     recommendedShutterSpeed: exposure.shutterSpeedFraction,
     recommendedShutterSeconds: exposure.shutterSeconds,
-    evScene: scenario.lightLevelEv,
+    evScene: sceneEv,
     whiteBalance: exposure.whiteBalanceDescription,
-    aebFrames,
+    aebFrames: aebRecommended ? aebFrames : 1,
     aebEvStep,
     aebRecommended,
+    bracketedFrames,
+    bracketSpanEv,
+    totalDynamicRangeStops,
+    totalRawShotsWithBracketing,
     tripodMode: tripodOn,
     vibrationMitigation: exposure.vibrationMitigation,
 

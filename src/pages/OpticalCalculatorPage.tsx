@@ -4,6 +4,8 @@ import { calculateDof, getCircleOfConfusionMm } from '../calculations/dof';
 import { calculateHyperfocalDistanceM, getHyperfocalTable } from '../calculations/hyperfocal';
 import { assessDiffraction, calculateAiryDiskUm } from '../calculations/diffraction';
 import { SliderControl } from '../components/SliderControl';
+import { InfinityFocusSweetSpotGraph } from '../components/InfinityFocusSweetSpotGraph';
+import { ExposureBracketingPanel } from '../components/ExposureBracketingPanel';
 import {
   Calculator,
   Eye,
@@ -154,8 +156,19 @@ export const OpticalCalculatorPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Visual Depth Bar, Hyperfocal Table, Diffraction Graph (7 Cols) */}
+        {/* Right Column: Interactive Graph, Visual Depth Bar, Hyperfocal Table, Diffraction Graph (7 Cols) */}
         <div className="lg:col-span-7 flex flex-col gap-5">
+          {/* Interactive Infinity Focus Sweet Spot Graph */}
+          <InfinityFocusSweetSpotGraph
+            focalLengthMm={focalLengthMm}
+            aperture={aperture}
+            focusDistanceM={focusDistanceM}
+            onFocusChange={setFocusDistanceM}
+            circleOfConfusionMm={coc}
+            cameraModel={selectedCamera.model}
+            lensModel={selectedLens.model}
+          />
+
           {/* Depth of Field Visual Span Bar */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between">
@@ -311,6 +324,9 @@ export const OpticalCalculatorPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Exposure Value (EV) & Auto Exposure Bracketing (AEB) Engine */}
+      <ExposureBracketingPanel />
     </div>
   );
 };

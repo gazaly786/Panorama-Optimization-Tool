@@ -4,6 +4,7 @@ import { ResultCard } from '../components/ResultCard';
 import { PanoramaVisualizer360 } from '../components/PanoramaVisualizer360';
 import { VerticalRowVisualizer } from '../components/VerticalRowVisualizer';
 import { ParallaxVisualizer } from '../components/ParallaxVisualizer';
+import { ExposureBracketingPanel } from '../components/ExposureBracketingPanel';
 import { SliderControl } from '../components/SliderControl';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
 import {
@@ -24,6 +25,7 @@ import {
   Focus,
   Gauge,
   Lock,
+  Sun,
 } from 'lucide-react';
 import { QualityPriority, ExposureDialMode } from '../types';
 
@@ -61,7 +63,7 @@ export const OptimizerPage: React.FC = () => {
   } = usePanorama();
 
   const [mode, setMode] = useState<'SIMPLE' | 'ADVANCED'>('SIMPLE');
-  const [activeVisualizer, setActiveVisualizer] = useState<'360' | 'ROWS' | 'PARALLAX'>('360');
+  const [activeVisualizer, setActiveVisualizer] = useState<'360' | 'ROWS' | 'PARALLAX' | 'EXPOSURE_AEB'>('360');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [presetName, setPresetName] = useState('');
 

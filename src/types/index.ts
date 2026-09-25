@@ -116,6 +116,15 @@ export type QualityPriority = 'FAST' | 'BALANCED' | 'MAXIMUM_QUALITY';
 export type PanoramaCoverage = '360x180' | '360_cylindrical' | 'partial_horizontal' | 'custom';
 export type ExposureDialMode = 'M' | 'Tv' | 'Av' | 'P' | 'AUTO_SPORTS';
 
+export interface BracketedFrame {
+  index: number;
+  evOffset: number; // e.g. -2, 0, +2
+  ev100: number; // scene EV + offset
+  shutterSeconds: number;
+  shutterFraction: string;
+  purpose: string;
+}
+
 export interface UserRigPreset {
   id: string;
   name: string;
@@ -135,6 +144,10 @@ export interface UserRigPreset {
   panoramicHeadModel?: string;
   upperRailOffsetMm?: number;
   lowerRailOffsetMm?: number;
+  customSceneEv?: number;
+  aebEnabled?: boolean;
+  aebFrames?: number;
+  aebEvStep?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -194,6 +207,10 @@ export interface OpticalCalculationResults {
   aebFrames: number;
   aebEvStep: number;
   aebRecommended: boolean;
+  bracketedFrames: BracketedFrame[];
+  bracketSpanEv: number;
+  totalDynamicRangeStops: number;
+  totalRawShotsWithBracketing: number;
   tripodMode: boolean;
   vibrationMitigation: {
     mirrorLockUp: boolean;

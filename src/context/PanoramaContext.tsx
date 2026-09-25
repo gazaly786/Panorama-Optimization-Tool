@@ -36,6 +36,10 @@ interface PanoramaContextType {
   coverage: PanoramaCoverage;
   customCoCMm?: number;
   exposureDialMode: ExposureDialMode;
+  customSceneEv?: number;
+  customAebEnabled?: boolean;
+  customAebFrames?: number;
+  customAebEvStep?: number;
 
   // Comparison selections
   comparisonCameraIds: string[];
@@ -59,6 +63,10 @@ interface PanoramaContextType {
   setCoverage: (cov: PanoramaCoverage) => void;
   setCustomCoCMm: (coc?: number) => void;
   setExposureDialMode: (mode: ExposureDialMode) => void;
+  setCustomSceneEv: (ev?: number) => void;
+  setCustomAebEnabled: (enabled?: boolean) => void;
+  setCustomAebFrames: (frames?: number) => void;
+  setCustomAebEvStep: (step?: number) => void;
 
   // Comparison actions
   toggleCameraComparison: (cameraId: string) => void;
@@ -184,6 +192,10 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [coverage, setCoverage] = useState<PanoramaCoverage>('360x180');
   const [customCoCMm, setCustomCoCMm] = useState<number | undefined>(undefined);
   const [exposureDialMode, setExposureDialMode] = useState<ExposureDialMode>('M');
+  const [customSceneEv, setCustomSceneEv] = useState<number | undefined>(undefined);
+  const [customAebEnabled, setCustomAebEnabled] = useState<boolean | undefined>(undefined);
+  const [customAebFrames, setCustomAebFrames] = useState<number | undefined>(undefined);
+  const [customAebEvStep, setCustomAebEvStep] = useState<number | undefined>(undefined);
 
   // Comparison State
   const [comparisonCameraIds, setComparisonCameraIds] = useState<string[]>(['canon-90d', 'sony-a7iv']);
@@ -266,6 +278,10 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     customIso,
     customFocusDistanceM: focusDistanceM,
     customCoCMm,
+    customSceneEv,
+    customAebEnabled,
+    customAebFrames,
+    customAebEvStep,
   };
 
   const results = optimizePanoramaSettings(calculationInputs);
@@ -326,6 +342,10 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       panoramicHeadModel: 'Panoramic Head (Standard)',
       upperRailOffsetMm: selectedLens.entrancePupilOffsetMm || 45,
       lowerRailOffsetMm: 52,
+      customSceneEv,
+      aebEnabled: customAebEnabled !== undefined ? customAebEnabled : results.aebRecommended,
+      aebFrames: results.aebFrames,
+      aebEvStep: results.aebEvStep,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -352,6 +372,10 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (preset.overlapPct !== undefined) setTargetOverlapPct(preset.overlapPct / 100);
     if (preset.qualityPriority) setQualityPriority(preset.qualityPriority);
     if (preset.tripodOn !== undefined) setTripodOn(preset.tripodOn);
+    if (preset.customSceneEv !== undefined) setCustomSceneEv(preset.customSceneEv);
+    if (preset.aebEnabled !== undefined) setCustomAebEnabled(preset.aebEnabled);
+    if (preset.aebFrames !== undefined) setCustomAebFrames(preset.aebFrames);
+    if (preset.aebEvStep !== undefined) setCustomAebEvStep(preset.aebEvStep);
   };
 
   const deleteSetup = (id: string) => {
@@ -444,6 +468,10 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         coverage,
         customCoCMm,
         exposureDialMode,
+        customSceneEv,
+        customAebEnabled,
+        customAebFrames,
+        customAebEvStep,
         comparisonCameraIds,
         comparisonLensIds,
         results,
@@ -461,6 +489,10 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setCoverage,
         setCustomCoCMm,
         setExposureDialMode,
+        setCustomSceneEv,
+        setCustomAebEnabled,
+        setCustomAebFrames,
+        setCustomAebEvStep,
         toggleCameraComparison,
         toggleLensComparison,
         addCamera,
