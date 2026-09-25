@@ -1,0 +1,6 @@
+{
+  "name": "PanoOptix - Panorama Camera & Lens Optimizer",
+  "description": "Professional optical calculation and settings optimization engine for 360° panorama photography.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
