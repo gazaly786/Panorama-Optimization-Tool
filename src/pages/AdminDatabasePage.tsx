@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { usePanorama } from '../context/PanoramaContext';
 import { CameraSpec, LensSpec, SensorFormat, ProjectionType } from '../types';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
+import { ExcelGearUploadModal } from '../components/ExcelGearUploadModal';
+import { downloadSampleExcelTemplate } from '../utils/excelGearParser';
 import {
   Database,
   Plus,
@@ -14,6 +16,8 @@ import {
   Layers,
   CheckCircle,
   FileSpreadsheet,
+  UserCheck,
+  Sparkles,
 } from 'lucide-react';
 
 export const AdminDatabasePage: React.FC = () => {
@@ -36,6 +40,7 @@ export const AdminDatabasePage: React.FC = () => {
   const [lensModalOpen, setLensModalOpen] = useState(false);
   const [importJsonText, setImportJsonText] = useState('');
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
 
   // New Camera Form State
   const [cameraForm, setCameraForm] = useState<Partial<CameraSpec>>({
@@ -222,6 +227,23 @@ export const AdminDatabasePage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => setExcelModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition shadow-md"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Upload Gear Excel</span>
+          </button>
+          <button
+            type="button"
+            onClick={downloadSampleExcelTemplate}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+            title="Download blank sample Excel template with Cameras & Lenses columns"
+          >
+            <Download className="w-4 h-4 text-amber-400" />
+            <span>Excel Template</span>
+          </button>
+          <button
+            type="button"
             onClick={handleExportJson}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
           >
@@ -241,10 +263,39 @@ export const AdminDatabasePage: React.FC = () => {
             onClick={() => setImportModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
           >
-            <Upload className="w-4 h-4 text-amber-400" />
+            <Upload className="w-4 h-4 text-slate-400" />
             <span>Import JSON</span>
           </button>
         </div>
+      </div>
+
+      {/* Creator Attribution & Master Database Banner */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <UserCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black text-white">App Creator & Lead Optical Architect: Gazaly Samsadeen</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-400 font-bold">
+                MASTER CURATOR
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Verified optical calibration benchmarks, sensor formats, entrance pupil measurements, and high-precision panoramic presets.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setExcelModalOpen(true)}
+          className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold transition flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Batch Update via Excel</span>
+        </button>
       </div>
 
       {/* Tabs */}
@@ -720,6 +771,12 @@ export const AdminDatabasePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Excel Upload Modal */}
+      <ExcelGearUploadModal
+        isOpen={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+      />
     </div>
   );
 };

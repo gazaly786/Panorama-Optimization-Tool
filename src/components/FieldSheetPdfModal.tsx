@@ -208,7 +208,7 @@ export const FieldSheetPdfModal: React.FC<FieldSheetPdfModalProps> = ({
                   {title}
                 </h1>
                 <p className={`text-xs mt-0.5 ${printTheme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
-                  Standard Field Reference Sheet · Generated {currentDate} · Calibration Verified
+                  Standard Field Reference Sheet · Created by <strong className="text-amber-600">Gazaly Samsadeen</strong> · Generated {currentDate}
                 </p>
               </div>
 
@@ -562,9 +562,10 @@ export const FieldSheetPdfModal: React.FC<FieldSheetPdfModalProps> = ({
             </div>
 
             {/* Footer Sign-off */}
-            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-1 text-[10px] text-slate-500 font-mono">
               <span>PanoOptix Optical Verification System · Field Spec ID: #{camera.id.toUpperCase()}-{shotsPerCircle}S</span>
-              <span>Photographer Signature: __________________________</span>
+              <span>Lead Optical Architect: <strong className="text-amber-600">Gazaly Samsadeen</strong></span>
+              <span>Photographer Sign-off: __________________________</span>
             </div>
           </div>
         </div>

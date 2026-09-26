@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { usePanorama } from '../context/PanoramaContext';
 import { calculateNodalAlignment } from '../calculations/nodal';
 import { FieldSheetPdfModal } from '../components/FieldSheetPdfModal';
+import { ExcelGearUploadModal } from '../components/ExcelGearUploadModal';
 import {
   formatDualMm,
   formatDualDistance,
@@ -27,6 +28,7 @@ import {
   FileText,
   HelpCircle,
   Check,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 const POPULAR_PANO_HEADS = [
@@ -73,6 +75,7 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
   const [rigName, setRigName] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
   // Shots slider state (defaults to active custom or calculated shots)
   const currentShots = customShotsPerCircle || results.shotsPerCircle || 4;
@@ -151,6 +154,15 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsExcelModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition border border-slate-700"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Upload Gear Excel</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setIsPdfModalOpen(true)}
@@ -523,6 +535,12 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
         results={results}
         shotsPerCircle={currentShots}
         rigTitle={rigName || `${selectedCamera.brand} ${selectedCamera.model} + ${selectedLens.brand} ${selectedLens.model} (${currentShots}-Shot Rig)`}
+      />
+
+      {/* Excel Upload Modal */}
+      <ExcelGearUploadModal
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
       />
     </div>
   );

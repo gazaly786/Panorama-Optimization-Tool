@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { usePanorama } from '../context/PanoramaContext';
 import { CameraSpec, SensorFormat } from '../types';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
+import { ExcelGearUploadModal } from '../components/ExcelGearUploadModal';
 import {
   Camera,
   Search,
@@ -13,6 +14,7 @@ import {
   Plus,
   Scale,
   Cpu,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const CameraDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; onNavigateToAdmin: () => void }> = ({
@@ -31,6 +33,7 @@ export const CameraDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; o
   const [selectedFormat, setSelectedFormat] = useState<string>('ALL');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
   const [modalCamera, setModalCamera] = useState<CameraSpec | null>(null);
+  const [excelModalOpen, setExcelModalOpen] = useState<boolean>(false);
 
   // Filter cameras
   const filteredCameras = cameras.filter((cam) => {
@@ -63,14 +66,24 @@ export const CameraDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; o
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onNavigateToAdmin}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
-        >
-          <Plus className="w-4 h-4 text-amber-400" />
-          <span>Add Custom Camera</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setExcelModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition shadow-md"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Upload Excel (.xlsx)</span>
+          </button>
+          <button
+            type="button"
+            onClick={onNavigateToAdmin}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+          >
+            <Plus className="w-4 h-4 text-amber-400" />
+            <span>Add Custom Camera</span>
+          </button>
+        </div>
       </div>
 
       {/* Search & Filter Toolbar */}
@@ -356,6 +369,12 @@ export const CameraDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; o
           </div>
         </div>
       )}
+
+      {/* Excel Upload Modal */}
+      <ExcelGearUploadModal
+        isOpen={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+      />
     </div>
   );
 };

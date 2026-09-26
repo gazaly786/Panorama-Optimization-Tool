@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { usePanorama } from '../context/PanoramaContext';
 import { LensSpec, ProjectionType } from '../types';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
+import { ExcelGearUploadModal } from '../components/ExcelGearUploadModal';
 import {
   Layers,
   Search,
@@ -12,6 +13,7 @@ import {
   Scale,
   Sparkles,
   Crosshair,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const LensDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; onNavigateToAdmin: () => void }> = ({
@@ -30,6 +32,7 @@ export const LensDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; onN
   const [selectedProjection, setSelectedProjection] = useState<string>('ALL');
   const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
   const [modalLens, setModalLens] = useState<LensSpec | null>(null);
+  const [excelModalOpen, setExcelModalOpen] = useState<boolean>(false);
 
   const filteredLenses = lenses.filter((lens) => {
     const matchesSearch =
@@ -65,14 +68,24 @@ export const LensDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; onN
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onNavigateToAdmin}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
-        >
-          <Plus className="w-4 h-4 text-amber-400" />
-          <span>Add Custom Lens</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setExcelModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition shadow-md"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Upload Excel (.xlsx)</span>
+          </button>
+          <button
+            type="button"
+            onClick={onNavigateToAdmin}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+          >
+            <Plus className="w-4 h-4 text-amber-400" />
+            <span>Add Custom Lens</span>
+          </button>
+        </div>
       </div>
 
       {/* Search & Filter Toolbar */}
@@ -356,6 +369,12 @@ export const LensDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; onN
           </div>
         </div>
       )}
+
+      {/* Excel Upload Modal */}
+      <ExcelGearUploadModal
+        isOpen={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+      />
     </div>
   );
 };
