@@ -1,1 +1,47 @@
 @import "tailwindcss";
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide app navigation and interactive controls */
+  .no-print,
+  nav,
+  header,
+  footer,
+  button {
+    display: none !important;
+  }
+
+  /* Allow modal content to flow into standard print page */
+  .fixed.inset-0 {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  #pano-printable-field-sheet {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    page-break-inside: avoid;
+  }
+
+  #pano-printable-field-sheet * {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+

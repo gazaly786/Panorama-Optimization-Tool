@@ -30,6 +30,7 @@ export interface OptimizerInputs {
   customAebEnabled?: boolean;
   customAebFrames?: number;
   customAebEvStep?: number;
+  customShotsPerCircle?: number;
 }
 
 /**
@@ -48,7 +49,7 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
   } = inputs;
 
   const focalLengthMm = inputs.focalLengthMm || lens.focalLengthMinMm;
-  const subjectDistanceM = inputs.subjectDistanceM !== undefined ? inputs.subjectDistanceM : scenario.defaultSubjectDistanceM;
+  const subjectDistanceM = inputs.subjectDistanceM !== undefined ? inputs.subjectDistanceM : 0.5;
   const targetOverlap = inputs.targetOverlapPct !== undefined ? inputs.targetOverlapPct : (scenario.recommendedOverlapPct / 100);
   const sceneEv = inputs.customSceneEv !== undefined ? inputs.customSceneEv : scenario.lightLevelEv;
 
@@ -120,7 +121,8 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
     focalLengthMm,
     targetOverlap,
     '360x180',
-    true // portrait orientation
+    true, // portrait orientation
+    inputs.customShotsPerCircle
   );
 
   // 7. Exposure, ISO, Shutter, Vibration
@@ -165,7 +167,7 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
   );
 
   const bracketSpanEv = (aebRecommended && aebFrames > 1) ? (aebFrames - 1) * aebEvStep : 0;
-  const sensorDr = camera.sensorFormat === 'Full Frame' ? 14.5 : 12.8;
+  const sensorDr = camera.sensorFormat === 'Full-Frame' ? 14.5 : 12.8;
   const totalDynamicRangeStops = Math.round((sensorDr + bracketSpanEv) * 10) / 10;
   const totalRawShotsWithBracketing = panoGeo.totalShots * (aebRecommended ? aebFrames : 1);
 

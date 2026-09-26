@@ -6,7 +6,7 @@ export const PANORAMA_SCENARIOS: PanoramaScenario[] = [
     name: 'Real Estate Interior',
     category: 'Interior',
     description: 'Residential living rooms, bedrooms, and kitchens. Prioritizes sharp foreground furniture, balanced window view HDR, and clean ceiling stitching.',
-    defaultSubjectDistanceM: 2.0,
+    defaultSubjectDistanceM: 0.5,
     lightLevelEv: 8, // EV 8 interior ambient
     recommendedAeb: { frames: 3, evStep: 2, enabled: true },
     qualityPriority: 'MAXIMUM_QUALITY',

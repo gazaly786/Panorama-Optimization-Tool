@@ -4,13 +4,18 @@ import { PanoramaVisualizer360 } from '../components/PanoramaVisualizer360';
 import { VerticalRowVisualizer } from '../components/VerticalRowVisualizer';
 import { SliderControl } from '../components/SliderControl';
 import {
+  formatDualMm,
+  formatDualDimensions,
+  formatDetentAngles,
+} from '../utils/units';
+import {
   Globe,
   Sliders,
   Compass,
   Layers,
-  ArrowRight,
   Info,
-  Maximize2,
+  RotateCw,
+  Check,
   CheckCircle,
 } from 'lucide-react';
 import { PanoramaCoverage } from '../types';
@@ -22,22 +27,44 @@ export const PanoramaCalculatorPage: React.FC = () => {
     currentFocalLengthMm,
     targetOverlapPct,
     setTargetOverlapPct,
+    customShotsPerCircle,
+    setCustomShotsPerCircle,
     coverage,
     setCoverage,
     results,
   } = usePanorama();
 
+  const currentShots = customShotsPerCircle || results.shotsPerCircle || 4;
+  const stepAngle = Math.round((360 / currentShots) * 10) / 10;
+  const detentSequence = formatDetentAngles(currentShots);
+
+  const handleShotsChange = (shots: number) => {
+    setCustomShotsPerCircle(shots);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6">
       {/* Header */}
-      <div className="border-b border-slate-800 pb-5">
-        <div className="flex items-center gap-2">
-          <Globe className="w-6 h-6 text-amber-400" />
-          <h1 className="text-2xl font-black text-white">Panorama Geometry & Resolution Calculator</h1>
+      <div className="border-b border-slate-800 pb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Globe className="w-6 h-6 text-amber-400" />
+            <h1 className="text-2xl font-black text-white">Panorama Geometry & Resolution Calculator</h1>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Calculate angular rotation increments, overlap safety margins, shots count per circle, multi-row pitches, and estimated stitched equirectangular resolution.
+          </p>
         </div>
-        <p className="text-xs text-slate-400 mt-1">
-          Calculate angular rotation increments, overlap safety margins, multi-row pitches, spherical 360° × 180° coverage, and estimated stitched output dimensions.
-        </p>
+
+        {/* Gear Context Pill with Dual Units */}
+        <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-right">
+          <div className="text-white font-bold">
+            {selectedCamera.brand} {selectedCamera.model} · {selectedLens.brand} {selectedLens.model}
+          </div>
+          <div className="text-slate-400 font-mono text-[11px] mt-0.5">
+            Sensor: {formatDualDimensions(selectedCamera.sensorWidthMm, selectedCamera.sensorHeightMm)} · Lens: {formatDualMm(currentFocalLengthMm)}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -74,6 +101,69 @@ export const PanoramaCalculatorPage: React.FC = () => {
               </div>
             </div>
 
+            {/* 360° Shots Count Slider (Each Side Rotation) */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <RotateCw className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs font-semibold text-slate-300">
+                    Shots Count Slider (Around 360° Circle):
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base font-mono font-black text-amber-400">
+                    {currentShots} Shots
+                  </span>
+                  <span className="text-xs font-mono text-slate-400">
+                    ({stepAngle}° / side)
+                  </span>
+                </div>
+              </div>
+
+              <input
+                type="range"
+                min={3}
+                max={24}
+                step={1}
+                value={currentShots}
+                onChange={(e) => handleShotsChange(parseInt(e.target.value, 10))}
+                className="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-amber-500"
+              />
+
+              {/* Quick Preset Chips */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[
+                  { shots: 3, label: '3 (120°)' },
+                  { shots: 4, label: '4 (90°)' },
+                  { shots: 6, label: '6 (60°)' },
+                  { shots: 8, label: '8 (45°)' },
+                  { shots: 12, label: '12 (30°)' },
+                  { shots: 16, label: '16 (22.5°)' },
+                ].map((item) => (
+                  <button
+                    key={item.shots}
+                    type="button"
+                    onClick={() => handleShotsChange(item.shots)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition border ${
+                      currentShots === item.shots
+                        ? 'bg-amber-500 text-slate-950 border-amber-400'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCustomShotsPerCircle(undefined)}
+                  className="px-2 py-1 rounded-lg text-[10px] font-mono text-slate-500 hover:text-slate-300 border border-slate-800"
+                  title="Auto-calculate from target overlap percentage"
+                >
+                  Auto
+                </button>
+              </div>
+            </div>
+
             {/* Overlap Slider */}
             <SliderControl
               label="Stitching Overlap Percentage"
@@ -98,7 +188,10 @@ export const PanoramaCalculatorPage: React.FC = () => {
                   ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                   : 'bg-sky-500/20 text-sky-400 border-sky-500/30'
               }
-              onChange={(val) => setTargetOverlapPct(val / 100)}
+              onChange={(val) => {
+                setTargetOverlapPct(val / 100);
+                setCustomShotsPerCircle(undefined); // let overlap recompute shots
+              }}
               presetValues={[
                 { label: '10%', value: 10 },
                 { label: '20%', value: 20 },

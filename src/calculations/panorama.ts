@@ -46,7 +46,8 @@ export function calculatePanoramaGeometry(
   focalLengthMm: number,
   targetOverlapPct: number, // 0.10 to 0.50
   coverage: PanoramaCoverage = '360x180',
-  preferPortraitOrientation = true
+  preferPortraitOrientation = true,
+  customShotsPerCircle?: number
 ): PanoramaGeometryResult {
   const fov = calculateFov(camera, lens, focalLengthMm);
 
@@ -80,32 +81,39 @@ export function calculatePanoramaGeometry(
 
   // Find standard click stop that yields at least rawShots or safe practical count
   let shotsPerCircle = Math.ceil(rawShots);
-
-  // For fisheye lenses, standard practical counts are 3, 4, 6, or 8 shots around
-  if (fov.isFisheye) {
-    if (frameHfov >= 170) {
-      shotsPerCircle = Math.max(3, shotsPerCircle);
-    } else if (frameHfov >= 130) {
-      // e.g. Sigma 8mm on APS-C (Canon 90D): 6 shots around @ 60 deg is gold standard
-      shotsPerCircle = Math.max(6, shotsPerCircle);
-    } else {
-      shotsPerCircle = Math.max(6, shotsPerCircle);
-    }
-  }
-
-  // Snap to nearest integer divisor of 360 if available
   let bestStop = 360 / shotsPerCircle;
-  for (const stop of STANDARD_ROTATOR_STOPS) {
-    const candidateShots = 360 / stop;
-    if (candidateShots >= shotsPerCircle) {
-      bestStop = stop;
-      shotsPerCircle = candidateShots;
-      break;
+
+  // If user specified custom shots count (e.g. 4, 6, 8, etc.)
+  if (customShotsPerCircle && customShotsPerCircle >= 3) {
+    shotsPerCircle = Math.round(customShotsPerCircle);
+    bestStop = Math.round((360 / shotsPerCircle) * 10) / 10;
+  } else {
+    // For fisheye lenses, standard practical counts are 3, 4, 6, or 8 shots around
+    if (fov.isFisheye) {
+      if (frameHfov >= 170) {
+        shotsPerCircle = Math.max(3, shotsPerCircle);
+      } else if (frameHfov >= 130) {
+        // e.g. Sigma 8mm on APS-C (Canon 90D): 6 shots around @ 60 deg is gold standard
+        shotsPerCircle = Math.max(6, shotsPerCircle);
+      } else {
+        shotsPerCircle = Math.max(6, shotsPerCircle);
+      }
+    }
+
+    // Snap to nearest integer divisor of 360 if available
+    bestStop = 360 / shotsPerCircle;
+    for (const stop of STANDARD_ROTATOR_STOPS) {
+      const candidateShots = 360 / stop;
+      if (candidateShots >= shotsPerCircle) {
+        bestStop = stop;
+        shotsPerCircle = candidateShots;
+        break;
+      }
     }
   }
 
   // Exact rotation angle and resulting actual overlap
-  const rotationDeg = 360 / shotsPerCircle;
+  const rotationDeg = Math.round((360 / shotsPerCircle) * 10) / 10;
   const actualOverlapPct = Math.round((1 - (rotationDeg / frameHfov)) * 100);
 
   // Overlap category

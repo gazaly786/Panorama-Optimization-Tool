@@ -40,6 +40,7 @@ interface PanoramaContextType {
   customAebEnabled?: boolean;
   customAebFrames?: number;
   customAebEvStep?: number;
+  customShotsPerCircle?: number;
 
   // Comparison selections
   comparisonCameraIds: string[];
@@ -67,6 +68,7 @@ interface PanoramaContextType {
   setCustomAebEnabled: (enabled?: boolean) => void;
   setCustomAebFrames: (frames?: number) => void;
   setCustomAebEvStep: (step?: number) => void;
+  setCustomShotsPerCircle: (shots?: number) => void;
 
   // Comparison actions
   toggleCameraComparison: (cameraId: string) => void;
@@ -111,7 +113,7 @@ const DEFAULT_PRESET: UserRigPreset = {
   lensId: 'sigma-8mm-f35-fisheye',
   focalLengthMm: 8,
   scenarioId: 'real-estate-interior',
-  subjectDistanceM: 2.0,
+  subjectDistanceM: 0.5,
   focusDistanceM: 1.2,
   aperture: 8,
   iso: 100,
@@ -182,7 +184,7 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const [currentFocalLengthMm, setCurrentFocalLengthMm] = useState<number>(8);
-  const [subjectDistanceM, setSubjectDistanceM] = useState<number>(2.0);
+  const [subjectDistanceM, setSubjectDistanceM] = useState<number>(0.5);
   const [focusDistanceM, setFocusDistanceM] = useState<number | undefined>(undefined);
   const [customAperture, setCustomAperture] = useState<number | undefined>(undefined);
   const [customIso, setCustomIso] = useState<number | undefined>(undefined);
@@ -196,6 +198,7 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [customAebEnabled, setCustomAebEnabled] = useState<boolean | undefined>(undefined);
   const [customAebFrames, setCustomAebFrames] = useState<number | undefined>(undefined);
   const [customAebEvStep, setCustomAebEvStep] = useState<number | undefined>(undefined);
+  const [customShotsPerCircle, setCustomShotsPerCircle] = useState<number | undefined>(undefined);
 
   // Comparison State
   const [comparisonCameraIds, setComparisonCameraIds] = useState<string[]>(['canon-90d', 'sony-a7iv']);
@@ -282,6 +285,7 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     customAebEnabled,
     customAebFrames,
     customAebEvStep,
+    customShotsPerCircle,
   };
 
   const results = optimizePanoramaSettings(calculationInputs);
@@ -472,6 +476,7 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         customAebEnabled,
         customAebFrames,
         customAebEvStep,
+        customShotsPerCircle,
         comparisonCameraIds,
         comparisonLensIds,
         results,
@@ -493,6 +498,7 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setCustomAebEnabled,
         setCustomAebFrames,
         setCustomAebEvStep,
+        setCustomShotsPerCircle,
         toggleCameraComparison,
         toggleLensComparison,
         addCamera,

@@ -28,6 +28,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { QualityPriority, ExposureDialMode } from '../types';
+import { formatDualDistance, formatDualMm } from '../utils/units';
 
 export const OptimizerPage: React.FC = () => {
   const {
@@ -502,17 +503,18 @@ export const OptimizerPage: React.FC = () => {
               max={15}
               step={0.1}
               unit="m"
+              displayValueOverride={formatDualDistance(subjectDistanceM)}
               onChange={setSubjectDistanceM}
               presetValues={[
-                { label: '0.5m', value: 0.5 },
-                { label: '1m', value: 1.0 },
-                { label: '1.5m', value: 1.5 },
-                { label: '2m', value: 2.0 },
-                { label: '3m', value: 3.0 },
-                { label: '5m', value: 5.0 },
-                { label: '10m', value: 10.0 },
+                { label: '0.5m (1.6ft)', value: 0.5 },
+                { label: '1m (3.3ft)', value: 1.0 },
+                { label: '1.5m (4.9ft)', value: 1.5 },
+                { label: '2m (6.6ft)', value: 2.0 },
+                { label: '3m (9.8ft)', value: 3.0 },
+                { label: '5m (16.4ft)', value: 5.0 },
+                { label: '10m (32.8ft)', value: 10.0 },
               ]}
-              helperText="Distance to the nearest dominant furniture, doorway, or focal subject."
+              helperText="Distance to the nearest dominant furniture, doorway, or focal subject (Default: 0.5m / 1.64ft)."
             />
 
             {/* Overlap Slider */}
@@ -710,6 +712,18 @@ export const OptimizerPage: React.FC = () => {
                   <Crosshair className="w-3.5 h-3.5" />
                   <span>Parallax Check</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveVisualizer('EXPOSURE_AEB')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+                    activeVisualizer === 'EXPOSURE_AEB'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                  <span>HDR / AEB</span>
+                </button>
               </div>
             </div>
 
@@ -739,6 +753,10 @@ export const OptimizerPage: React.FC = () => {
 
             {activeVisualizer === 'PARALLAX' && (
               <ParallaxVisualizer entrancePupilOffsetMm={selectedLens.entrancePupilOffsetMm} />
+            )}
+
+            {activeVisualizer === 'EXPOSURE_AEB' && (
+              <ExposureBracketingPanel />
             )}
           </div>
         </div>

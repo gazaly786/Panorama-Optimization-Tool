@@ -16,7 +16,7 @@ export interface NodalCalibrationResult {
 export function calculateNodalAlignment(
   camera: CameraSpec,
   lens: LensSpec,
-  subjectDistanceM: number
+  subjectDistanceM: number = 0.5
 ): NodalCalibrationResult {
   // If the lens has a documented entrance pupil offset:
   // e.g. Sigma 8mm f/3.5 has entrance pupil approx 1.5 - 2.5 mm behind the gold ring / front element (~42mm from mount).

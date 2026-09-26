@@ -22,6 +22,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { ConfidenceBadge } from './ConfidenceBadge';
+import { formatDualDistance, metersToFeet } from '../utils/units';
 
 interface ResultCardProps {
   camera: CameraSpec;
@@ -141,9 +142,12 @@ STITCHING MARGIN: GOOD`;
           </div>
           <div className="text-2xl md:text-3xl font-mono font-black text-emerald-400 mt-1">
             ~{results.focusDistanceM.toFixed(1)} m
+            <span className="text-xs font-normal text-slate-400 ml-1.5">
+              ({metersToFeet(results.focusDistanceM).toFixed(1)} ft)
+            </span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono truncate">
-            DOF: {results.nearLimitM}m → {results.farLimitM >= 900 ? '∞' : `${results.farLimitM}m`}
+          <div className="text-[11px] text-slate-400 mt-1 font-mono truncate" title={`DOF: ${formatDualDistance(results.nearLimitM)} → ${formatDualDistance(results.farLimitM)}`}>
+            DOF: {results.nearLimitM}m ({metersToFeet(results.nearLimitM).toFixed(1)}ft) → {results.farLimitM >= 900 ? '∞' : `${results.farLimitM}m`}
           </div>
         </div>
 
