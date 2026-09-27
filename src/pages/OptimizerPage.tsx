@@ -5,8 +5,10 @@ import { PanoramaVisualizer360 } from '../components/PanoramaVisualizer360';
 import { VerticalRowVisualizer } from '../components/VerticalRowVisualizer';
 import { ParallaxVisualizer } from '../components/ParallaxVisualizer';
 import { ExposureBracketingPanel } from '../components/ExposureBracketingPanel';
+import { NodalPointCalculator } from '../components/NodalPointCalculator';
 import { SliderControl } from '../components/SliderControl';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
+import { FieldSheetPdfModal } from '../components/FieldSheetPdfModal';
 import {
   Camera,
   Layers,
@@ -26,17 +28,26 @@ import {
   Gauge,
   Lock,
   Sun,
+  Bookmark,
+  ArrowRight,
+  FileText,
+  RotateCw,
+  CheckSquare,
+  Wrench,
+  Check,
 } from 'lucide-react';
 import { QualityPriority, ExposureDialMode } from '../types';
 import { formatDualDistance, formatDualMm } from '../utils/units';
 
-export const OptimizerPage: React.FC = () => {
+export const OptimizerPage: React.FC<{ onNavigateToSaved?: () => void }> = ({ onNavigateToSaved }) => {
   const {
     cameras,
     lenses,
+    panoHeads,
     scenarios,
     selectedCamera,
     selectedLens,
+    selectedPanoHead,
     selectedScenario,
     currentFocalLengthMm,
     subjectDistanceM,
@@ -51,6 +62,7 @@ export const OptimizerPage: React.FC = () => {
     results,
     setSelectedCamera,
     setSelectedLens,
+    setSelectedPanoHead,
     setSelectedScenario,
     setCurrentFocalLengthMm,
     setSubjectDistanceM,
@@ -60,13 +72,27 @@ export const OptimizerPage: React.FC = () => {
     setTargetOverlapPct,
     setQualityPriority,
     setTripodOn,
+    customShotsPerCircle,
+    setCustomShotsPerCircle,
+    customAebEnabled,
+    setCustomAebEnabled,
+    customAebFrames,
+    setCustomAebFrames,
+    customAebEvStep,
+    setCustomAebEvStep,
+    upperRailOffsetMm,
+    setUpperRailOffsetMm,
     saveCurrentSetup,
   } = usePanorama();
 
+  // Mode state: SIMPLE (beginner) vs ADVANCED (pro)
   const [mode, setMode] = useState<'SIMPLE' | 'ADVANCED'>('SIMPLE');
-  const [activeVisualizer, setActiveVisualizer] = useState<'360' | 'ROWS' | 'PARALLAX' | 'EXPOSURE_AEB'>('360');
+  const [activeVisualizer, setActiveVisualizer] = useState<'360' | 'ROWS' | 'NODAL' | 'EXPOSURE_AEB'>('360');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [fieldSheetOpen, setFieldSheetOpen] = useState(false);
   const [presetName, setPresetName] = useState('');
+  const [presetDesc, setPresetDesc] = useState('');
+  const [notification, setNotification] = useState<string | null>(null);
 
   const isZoom = selectedLens.focalLengthMaxMm > selectedLens.focalLengthMinMm;
 
@@ -83,30 +109,56 @@ export const OptimizerPage: React.FC = () => {
     setTargetOverlapPct(0.35);
     setTripodOn(true);
     if (isZoom) setCurrentFocalLengthMm(selectedLens.focalLengthMaxMm);
-    setCustomAperture(8.0);
   };
 
-  const applyFastWorkflow = () => {
+  const applySpeedFirst = () => {
     setQualityPriority('FAST');
     setTargetOverlapPct(0.20);
-    setTripodOn(true);
     setCustomAperture(5.6);
   };
 
+  const handleOpenSaveModal = () => {
+    setPresetName(`${selectedCamera.brand} ${selectedCamera.model} + ${selectedLens.brand} ${selectedLens.model}`);
+    setPresetDesc(`Optimized for ${selectedScenario.name} · ${results.recommendedApertureString} @ ISO ${results.recommendedIso} · ${results.shotsPerCircle} shots around with ${selectedPanoHead.brand} ${selectedPanoHead.model}`);
+    setSaveModalOpen(true);
+  };
+
   const handleSaveRig = () => {
-    if (!presetName.trim()) {
-      saveCurrentSetup(`${selectedCamera.model} + ${selectedLens.model}`);
-    } else {
-      saveCurrentSetup(presetName.trim());
-    }
+    const finalName = presetName.trim() || `${selectedCamera.model} + ${selectedLens.model}`;
+    saveCurrentSetup(finalName, presetDesc.trim());
     setSaveModalOpen(false);
-    setPresetName('');
+    setNotification(`Saved "${finalName}" to Section 10 (Saved Rigs)!`);
+    setTimeout(() => {
+      setNotification(null);
+    }, 4500);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6">
-      {/* Workflow Step Indicator Banner */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+    <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6 relative">
+      {/* Toast Notification with Shortcut to Section 10 */}
+      {notification && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-amber-500/50 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce">
+          <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+          <div className="text-xs">
+            <span className="font-bold block text-white">{notification}</span>
+            <span className="text-[11px] text-slate-400">Stored in your browser presets database.</span>
+          </div>
+          {onNavigateToSaved && (
+            <button
+              type="button"
+              onClick={onNavigateToSaved}
+              className="ml-2 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition shadow"
+            >
+              <span>Go to Section 10</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Top Banner: Workflow Indicator & Mode Switcher */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Left: Workflow Steps */}
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto text-xs font-mono font-bold">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
             <span>1. CAMERA</span>
@@ -129,673 +181,1230 @@ export const OptimizerPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Simple vs Advanced Toggle */}
-        <div className="flex items-center gap-2 self-end md:self-auto">
-          <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center">
+        {/* Right: Mode Switcher & Quick Save Action */}
+        <div className="flex items-center gap-2.5 self-end md:self-auto flex-wrap">
+          <button
+            type="button"
+            onClick={handleOpenSaveModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+            title="Save this optimized rig configuration to Section 10 (Saved Rigs)"
+          >
+            <Bookmark className="w-3.5 h-3.5 text-amber-400" />
+            <span>Save Rig (Sec. 10)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFieldSheetOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+            title="Open printable & downloadable Field Sheet"
+          >
+            <FileText className="w-3.5 h-3.5 text-sky-400" />
+            <span>Field Sheet (PDF)</span>
+          </button>
+
+          {/* Prominent Mode Toggle: Simple vs Advanced */}
+          <div className="bg-slate-950 p-1 rounded-xl border border-slate-700/80 flex items-center shadow-inner">
             <button
               type="button"
               onClick={() => setMode('SIMPLE')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
                 mode === 'SIMPLE'
-                  ? 'bg-amber-500 text-slate-950 shadow'
+                  ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Simple Mode
+              <span>🟢 Simple Mode</span>
+              <span className="hidden sm:inline text-[10px] opacity-80">(Beginner)</span>
             </button>
             <button
               type="button"
               onClick={() => setMode('ADVANCED')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
                 mode === 'ADVANCED'
-                  ? 'bg-amber-500 text-slate-950 shadow'
+                  ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Advanced Mode
+              <span>⚡ Advanced Mode</span>
+              <span className="hidden sm:inline text-[10px] opacity-80">(Pro)</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Main 2-Column Layout: Controls on Left, Results & Visualizers on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Equipment & Optical Inputs (5 Cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-5">
-          {/* Quick Photography Intent Modes */}
-          <div className="flex items-center justify-between gap-2 p-1.5 bg-slate-900/90 rounded-2xl border border-slate-800">
-            <button
-              type="button"
-              onClick={applySharpnessFirst}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                qualityPriority === 'MAXIMUM_QUALITY' && targetOverlapPct === 0.30
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
-              title="Prioritizes lens sweet-spot aperture, optimal DOF, base ISO, and zero-vibration"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Sharpness First</span>
-            </button>
+      {/* ========================================================================= */}
+      {/* 🚀 QUICK SNAPSHOT SUMMARY CARD: Camera, Lens & Calculated Shots at a glance */}
+      {/* ========================================================================= */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900/95 to-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
+        {/* Subtle decorative glow */}
+        <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-amber-500/10 via-sky-500/5 to-transparent pointer-events-none rounded-r-2xl" />
 
-            <button
-              type="button"
-              onClick={applyMaxResolution}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                qualityPriority === 'MAXIMUM_QUALITY' && targetOverlapPct > 0.30
-                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
-              title="Maximizes final gigapixel panorama dimensions and safety overlap"
-            >
-              <Eye className="w-3.5 h-3.5 text-sky-400" />
-              <span>Max Resolution</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={applyFastWorkflow}
-              className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                qualityPriority === 'FAST'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
-              title="Minimizes number of shots and bracket overhead for rapid commercial coverage"
-            >
-              <Zap className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Fast Workflow</span>
-            </button>
-          </div>
-
-          {/* Primary Equipment Pickers Card */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Camera className="w-4 h-4 text-amber-400" />
-              <span>Selected Camera & Lens Equipment</span>
-            </h3>
-
-            {/* Camera Select */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-300 font-medium">1. Camera Body:</span>
-                <ConfidenceBadge status={selectedCamera.provenance.status} source={selectedCamera.provenance.source} />
+        <div className="flex flex-col gap-4 relative z-10">
+          {/* Card Top Title Row */}
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Sparkles className="w-3.5 h-3.5" />
               </div>
-              <div className="relative">
-                <select
-                  value={selectedCamera.id}
-                  onChange={(e) => {
-                    const cam = cameras.find((c) => c.id === e.target.value);
-                    if (cam) setSelectedCamera(cam);
-                  }}
-                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
-                >
-                  {cameras.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.brand} {c.model} ({c.sensorFormat} · {c.megapixels}MP)
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-              </div>
-              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1">
-                <span>Crop: {selectedCamera.cropFactor}x ({selectedCamera.sensorFormat})</span>
-                <span>Pitch: {results.pixelPitchUm.toFixed(2)}μm</span>
-                <span>Native: ISO {selectedCamera.nativeIso}</span>
-              </div>
-            </div>
-
-            {/* Lens Select */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-300 font-medium">2. Lens:</span>
-                <ConfidenceBadge status={selectedLens.provenance.status} source={selectedLens.provenance.source} />
-              </div>
-              <div className="relative">
-                <select
-                  value={selectedLens.id}
-                  onChange={(e) => {
-                    const l = lenses.find((item) => item.id === e.target.value);
-                    if (l) setSelectedLens(l);
-                  }}
-                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
-                >
-                  {lenses.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.brand} {l.model} [{l.projectionType.replace('_', ' ')}]
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-              </div>
-              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1">
-                <span className="text-amber-400 font-semibold">{results.isFisheye ? 'Fisheye Model' : 'Rectilinear'}</span>
-                <span>Sweet Spot: {selectedLens.sweetSpotAperture || 'f/5.6 - f/8'}</span>
-                <span>Entrance Pupil: ~{selectedLens.entrancePupilOffsetMm || 45}mm</span>
-              </div>
-            </div>
-
-            {/* Zoom Slider if Zoom Lens */}
-            {isZoom && (
-              <SliderControl
-                label="Lens Focal Length (Zoom)"
-                value={currentFocalLengthMm}
-                min={selectedLens.focalLengthMinMm}
-                max={selectedLens.focalLengthMaxMm}
-                step={1}
-                unit="mm"
-                onChange={setCurrentFocalLengthMm}
-                helperText={`Effective full-frame focal length: ${results.effectiveFocalLengthMm}mm`}
-              />
-            )}
-
-            {/* Scenario Preset Select */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-slate-300 font-medium">3. Shooting Scenario / Preset:</label>
-              <div className="relative">
-                <select
-                  value={selectedScenario.id}
-                  onChange={(e) => {
-                    const sc = scenarios.find((s) => s.id === e.target.value);
-                    if (sc) setSelectedScenario(sc);
-                  }}
-                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
-                >
-                  {scenarios.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.category} · EV {s.lightLevelEv})
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-              </div>
-              <p className="text-[11px] text-slate-400 px-1 leading-relaxed">
-                {selectedScenario.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Camera Mode Dial Selector & Advisory (Manual vs Tv vs Av vs Sports) */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <Gauge className="w-4 h-4 text-amber-400" />
-                <span>Camera Exposure Mode Dial</span>
-              </span>
-              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
-                exposureDialMode === 'M'
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                  : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-              }`}>
-                {exposureDialMode === 'M' ? 'GOLD STANDARD: MANUAL' : 'WARNING: NOT RECOMMENDED'}
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                Quick Snapshot Summary
+              </h2>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Live Optical State</span>
               </span>
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => setExposureDialMode('M')}
-                className={`py-2 px-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center justify-center transition border ${
-                  exposureDialMode === 'M'
-                    ? 'bg-emerald-500 text-slate-950 font-black shadow-md border-emerald-400'
-                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <span>M (Manual)</span>
-                <span className="text-[9px] opacity-80">Locked Best</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setExposureDialMode('Tv')}
-                className={`py-2 px-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center justify-center transition border ${
-                  exposureDialMode === 'Tv'
-                    ? 'bg-rose-500 text-white font-black shadow-md border-rose-400'
-                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <span>Tv (Shutter)</span>
-                <span className="text-[9px] opacity-80">Fluctuates Ap</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setExposureDialMode('Av')}
-                className={`py-2 px-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center justify-center transition border ${
-                  exposureDialMode === 'Av'
-                    ? 'bg-amber-500 text-slate-950 font-black shadow-md border-amber-400'
-                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <span>Av (Aperture)</span>
-                <span className="text-[9px] opacity-80">Shifts Shutter</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setExposureDialMode('AUTO_SPORTS')}
-                className={`py-2 px-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center justify-center transition border ${
-                  exposureDialMode === 'AUTO_SPORTS'
-                    ? 'bg-rose-600 text-white font-black shadow-md border-rose-500'
-                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <span>Sport / Auto</span>
-                <span className="text-[9px] opacity-80">Never Use</span>
-              </button>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+              <span className="hidden sm:inline">Pano Head:</span>
+              <strong className="text-slate-200">{selectedPanoHead.brand} {selectedPanoHead.model}</strong>
+              <span className="text-slate-600">·</span>
+              <span className="hidden sm:inline">NPP:</span>
+              <strong className="text-amber-400">{formatDualMm(upperRailOffsetMm || selectedLens.entrancePupilOffsetMm || 42)}</strong>
             </div>
+          </div>
 
-            {/* Mode Specific Analysis Callout */}
-            {exposureDialMode === 'M' ? (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div className="leading-relaxed text-[11px]">
-                  <strong>Manual (M) is the mandatory standard for 360° panoramas.</strong> It locks aperture ({results.recommendedApertureString}), shutter speed ({results.recommendedShutterSpeed}), and ISO ({results.recommendedIso}) identically across every single tile, guaranteeing zero exposure or depth-of-field jumps across seams.
+          {/* 3 Core Hero Columns: Camera, Lens, and Calculated Shot Count */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+            {/* 1. Camera Body */}
+            <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-3 sm:p-3.5 flex items-start gap-3 hover:border-slate-700 transition">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                <Camera className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-mono uppercase text-slate-400 font-bold tracking-wider">
+                  Camera Body
+                </div>
+                <div className="text-sm sm:text-base font-bold text-white truncate mt-0.5">
+                  {selectedCamera.brand} {selectedCamera.model}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="font-semibold text-slate-300">{selectedCamera.sensorFormat}</span>
+                  <span className="text-slate-600">·</span>
+                  <span>{selectedCamera.megapixels} MP</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="font-mono text-amber-400/90 font-medium">{selectedCamera.cropFactor.toFixed(1)}x Crop</span>
                 </div>
               </div>
-            ) : exposureDialMode === 'Tv' ? (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-xs flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-rose-400">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Why Tv (Time Value) Breaks Stitched Panoramas:</span>
+            </div>
+
+            {/* 2. Lens Attached */}
+            <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-3 sm:p-3.5 flex items-start gap-3 hover:border-slate-700 transition">
+              <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0 mt-0.5">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-mono uppercase text-slate-400 font-bold tracking-wider">
+                  Lens Attached
                 </div>
-                <p className="text-[11px] leading-relaxed text-rose-200/90 pl-5">
-                  In <strong>Tv mode</strong>, as you rotate 360° from a dark corner toward a bright window, the camera keeps shutter speed fixed and continuously shifts the <strong>Aperture</strong> (e.g. from f/4 to f/22)! Adjacent frames will have completely mismatched depths of field, corner softness, vignetting, and diffraction blur, making seamless stitching impossible.
+                <div className="text-sm sm:text-base font-bold text-white truncate mt-0.5">
+                  {selectedLens.brand} {selectedLens.model}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="font-mono font-semibold text-slate-300">
+                    {Math.round((results.effectiveFocalLengthMm / selectedCamera.cropFactor) * 10) / 10}mm
+                  </span>
+                  <span className="text-slate-600">·</span>
+                  <span className="capitalize">{selectedLens.projectionType.replace(/_/g, ' ').toLowerCase()}</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="font-mono text-sky-400/90 font-medium">{results.horizontalFovDeg}° HFOV</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Calculated Shot Count (Hero Output) */}
+            <div className="bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 border border-amber-500/40 rounded-xl p-3 sm:p-3.5 flex items-start gap-3 shadow-md hover:border-amber-400 transition">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shrink-0 mt-0.5 shadow-sm">
+                <RotateCw className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-mono uppercase text-amber-400 font-black tracking-wider flex items-center justify-between">
+                  <span>Calculated Shots</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                    {results.overlapPct}% Overlap
+                  </span>
+                </div>
+                <div className="text-base sm:text-lg font-black text-white mt-0.5 flex items-baseline gap-1.5">
+                  <span className="text-amber-400 font-mono text-xl">{results.shotsPerCircle} Shots</span>
+                  <span className="text-xs text-slate-300 font-medium">Around ({results.rotationIncrementDeg}° clicks)</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-slate-300 font-medium">{results.shotsPerCircle + 2} Full Sphere</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-emerald-400 font-mono font-semibold">
+                    {results.aebRecommended
+                      ? `${results.aebFrames}× AEB (${results.totalRawShotsWithBracketing} RAWs)`
+                      : 'Single Exposure'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 🟢 BEGINNER / SIMPLE MODE VIEW: Easy, Direct, Foolproof 1-2-3 Guide       */}
+      {/* ========================================================================= */}
+      {mode === 'SIMPLE' && (
+        <div className="flex flex-col gap-6">
+          {/* Quick Header Explain */}
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center shrink-0 text-sm">
+                123
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-sm">
+                  Beginner Simple Mode: Fast, Guaranteed 360° Setup
+                </h3>
+                <p className="text-slate-300 text-[11px] mt-0.5">
+                  Select your equipment below. The system automatically calculates your optimal camera dial settings, 4-shot rotation clicks, and panoramic head alignment.
                 </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMode('ADVANCED')}
+              className="text-[11px] font-mono text-amber-400 hover:text-amber-300 font-bold shrink-0 underline transition"
+            >
+              Switch to Advanced Pro Mode →
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column (5 Cols): Fast Gear Selectors */}
+            <div className="lg:col-span-5 flex flex-col gap-4">
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-amber-400" />
+                  <span>Step 1: Choose Your Equipment</span>
+                </h3>
+
+                {/* Camera Selector */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-slate-400 font-medium">Camera Body:</label>
+                  <div className="relative">
+                    <select
+                      value={selectedCamera.id}
+                      onChange={(e) => {
+                        const cam = cameras.find((c) => c.id === e.target.value);
+                        if (cam) setSelectedCamera(cam);
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-bold text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
+                    >
+                      {cameras.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.brand} {c.model} ({c.sensorFormat} · {c.megapixels} MP)
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Lens Selector */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-slate-400 font-medium">Lens:</label>
+                  <div className="relative">
+                    <select
+                      value={selectedLens.id}
+                      onChange={(e) => {
+                        const lens = lenses.find((l) => l.id === e.target.value);
+                        if (lens) setSelectedLens(lens);
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-bold text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
+                    >
+                      {lenses.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.brand} {l.model} ({l.focalLengthMinMm === l.focalLengthMaxMm ? `${l.focalLengthMinMm}mm` : `${l.focalLengthMinMm}-${l.focalLengthMaxMm}mm`} · {l.projectionType})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Panoramic Head Selector */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-slate-400 font-medium">Panoramic Tripod Head:</label>
+                  <div className="relative">
+                    <select
+                      value={selectedPanoHead.id}
+                      onChange={(e) => {
+                        const head = panoHeads.find((h) => h.id === e.target.value);
+                        if (head) setSelectedPanoHead(head);
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
+                    >
+                      {panoHeads.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.brand} {h.model} ({h.type})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Scenario Selector */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-slate-400 font-medium">Shooting Scenario:</label>
+                  <div className="relative">
+                    <select
+                      value={selectedScenario.id}
+                      onChange={(e) => {
+                        const s = scenarios.find((sc) => sc.id === e.target.value);
+                        if (s) setSelectedScenario(s);
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
+                    >
+                      {scenarios.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.category})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
+                  <p className="text-[11px] text-slate-400 px-1 mt-1 leading-relaxed">
+                    {selectedScenario.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Beginner Quick Checklist Card */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-emerald-400" />
+                  <span>Beginner 4-Step Field Routine</span>
+                </h3>
+                <ol className="flex flex-col gap-2.5 text-xs text-slate-300">
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center shrink-0 text-[11px]">1</span>
+                    <span><strong>Level the Tripod:</strong> Use the bubble level on your tripod base so rotation stays perfectly flat.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center shrink-0 text-[11px]">2</span>
+                    <span><strong>Mount in Portrait:</strong> Turn camera vertically (Portrait) so you capture maximum floor and ceiling height.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center shrink-0 text-[11px]">3</span>
+                    <span><strong>Set Rail Mark:</strong> Slide the upper rail to <strong className="text-amber-400">{formatDualMm(selectedLens.entrancePupilOffsetMm || 42)}</strong> to eliminate seam parallax errors.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-[11px]">4</span>
+                    <span><strong>Take 4 Shots:</strong> Rotate 90° for each click stop around the 360° circle. Done!</span>
+                  </li>
+                </ol>
+              </div>
+            </div>
+
+            {/* Right Column (7 Cols): The "Dial In Right Now" Golden Card & Visualizer */}
+            <div className="lg:col-span-7 flex flex-col gap-5">
+              {/* THE GOLDEN CAMERA DIAL-IN CARD */}
+              <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 border-2 border-amber-500/40 rounded-3xl p-6 shadow-xl flex flex-col gap-5">
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 font-black">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-black text-white">Dial These Into Your Camera Right Now</h2>
+                      <p className="text-xs text-slate-400">Guaranteed tack-sharp panorama settings for {selectedCamera.model} + {selectedLens.model}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    4 SHOTS DEFAULT · 90° CLICKS
+                  </span>
+                </div>
+
+                {/* Big Stat Dial Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
+                  {/* Mode Dial */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] uppercase font-mono text-slate-500 block">Camera Mode</span>
+                    <span className="text-xl font-black text-emerald-400 block mt-0.5">M (Manual)</span>
+                    <span className="text-[10px] text-slate-400 mt-1 block">Locks exposure constant</span>
+                  </div>
+
+                  {/* Aperture */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] uppercase font-mono text-slate-500 block">Aperture Dial</span>
+                    <span className="text-xl font-black text-amber-400 block mt-0.5">{results.recommendedApertureString}</span>
+                    <span className="text-[10px] text-slate-400 mt-1 block">Sharp optical sweet spot</span>
+                  </div>
+
+                  {/* Shutter Speed */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] uppercase font-mono text-slate-500 block">Shutter Speed</span>
+                    <span className="text-xl font-black text-white block mt-0.5">{results.recommendedShutterSpeed}</span>
+                    <span className="text-[10px] text-slate-400 mt-1 block">{results.aebRecommended ? 'Use 3-shot AEB bracket' : 'Single exposure'}</span>
+                  </div>
+
+                  {/* ISO */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] uppercase font-mono text-slate-500 block">ISO Sensitivity</span>
+                    <span className="text-xl font-black text-white block mt-0.5">ISO {results.recommendedIso}</span>
+                    <span className="text-[10px] text-slate-400 mt-1 block">Cleanest dynamic range</span>
+                  </div>
+
+                  {/* Focus Ring */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] uppercase font-mono text-slate-500 block">Focus Ring Mark</span>
+                    <span className="text-xl font-black text-sky-400 block mt-0.5">1.2 m (4 ft)</span>
+                    <span className="text-[10px] text-amber-400 font-bold mt-1 block">Turn AF OFF & tape ring!</span>
+                  </div>
+
+                  {/* Rotator Detents */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] uppercase font-mono text-slate-500 block">Rotator Detents</span>
+                    <span className="text-xl font-black text-amber-400 block mt-0.5">4 Shots (90°)</span>
+                    <span className="text-[10px] text-emerald-400 font-bold mt-1 block">0° → 90° → 180° → 270°</span>
+                  </div>
+                </div>
+
+                {/* Panoramic Head Upper Rail Setting Banner */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/30 flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <span className="text-[10px] font-mono text-slate-400 uppercase block">
+                      Panoramic Head Upper Rail (No-Parallax Point / NPP):
+                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xl font-mono font-black text-amber-400">
+                        {formatDualMm(selectedLens.entrancePupilOffsetMm || 42)}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        (on {selectedPanoHead.brand} {selectedPanoHead.model})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFieldSheetOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition shadow flex items-center gap-1.5"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>Download PDF Spec Sheet</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* HDR Auto-Exposure Bracketing (AEB) 3-Shot Card for Beginners */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sun className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      HDR Auto-Exposure Bracketing: {results.aebRecommended ? `${results.aebFrames} Frames @ ±${results.aebEvStep} EV (Default)` : 'Single Exposure'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                      DYNAMIC RANGE: {results.totalDynamicRangeStops} EV STOPS
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCustomAebEnabled(customAebEnabled === false ? true : false)}
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition ${
+                        results.aebRecommended
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}
+                    >
+                      {results.aebRecommended ? '✓ 3-Shot AEB ON' : 'AEB OFF'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3 Frame Visual Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  {results.bracketedFrames.slice(0, 3).map((frame, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-2.5 rounded-xl border flex flex-col gap-1 ${
+                        frame.evOffset < 0
+                          ? 'bg-sky-950/30 border-sky-800/60 text-sky-200'
+                          : frame.evOffset === 0
+                          ? 'bg-slate-950 border-slate-800 text-slate-200'
+                          : 'bg-amber-950/30 border-amber-800/60 text-amber-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[10px] font-mono">
+                        <span className="font-bold">
+                          Frame {frame.index} ({frame.evOffset > 0 ? `+${frame.evOffset}` : frame.evOffset} EV)
+                        </span>
+                        <span className="font-black text-xs text-white">{frame.shutterFraction}</span>
+                      </div>
+                      <p className="text-[10px] opacity-80 leading-tight">
+                        {frame.purpose}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  <strong className="text-sky-300">How it works:</strong> At each of the 4 rotation clicks, the camera automatically fires 3 rapid exposures ({results.shotsPerCircle * (results.aebRecommended ? results.aebFrames : 1)} total raw tour shots). When merged in PTGui or Lightroom, bright sunny windows stay detailed without blowing out, while dark room corners stay clean and shadow-free.
+                </p>
+              </div>
+
+              {/* 360° Visualizer Card */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                    <Compass className="w-4 h-4 text-amber-400" />
+                    <span>360° Circle Rotation Visualizer (4 Shots @ 90° Detents)</span>
+                  </h3>
+                  <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                    {results.overlapPct}% Stitching Overlap
+                  </span>
+                </div>
+
+                <PanoramaVisualizer360
+                  shotsPerCircle={results.shotsPerCircle}
+                  rotationIncrementDeg={results.rotationIncrementDeg}
+                  effectiveHfovDeg={results.horizontalFovDeg}
+                  overlapPct={results.overlapPct}
+                  lensModel={selectedLens.model}
+                  isFisheye={results.isFisheye}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ⚡ ADVANCED / PRO MODE VIEW: Comprehensive Optical Physics & Deep Controls */}
+      {/* ========================================================================= */}
+      {mode === 'ADVANCED' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Equipment & Optical Inputs (5 Cols) */}
+          <div className="lg:col-span-5 flex flex-col gap-5">
+            {/* Quick Photography Intent Modes */}
+            <div className="flex items-center justify-between gap-2 p-1.5 bg-slate-900/90 rounded-2xl border border-slate-800">
+              <button
+                type="button"
+                onClick={applySharpnessFirst}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                  qualityPriority === 'MAXIMUM_QUALITY' && targetOverlapPct === 0.30
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+                title="Prioritizes lens sweet-spot aperture, optimal DOF, base ISO, and zero-vibration"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Sharpness First</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={applyMaxResolution}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                  qualityPriority === 'MAXIMUM_QUALITY' && targetOverlapPct > 0.30
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+                title="Maximizes panoramic resolution with tighter angular stepping and zoom focal length"
+              >
+                <Zap className="w-3.5 h-3.5 text-sky-400" />
+                <span>Max Megapixels</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={applySpeedFirst}
+                className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                  qualityPriority === 'FAST'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+                title="Fewer shots around circle for rapid tour capture and handheld speed"
+              >
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Fast Capture</span>
+              </button>
+            </div>
+
+            {/* Primary Equipment Pickers */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                <span>Hardware Rig Setup</span>
+                <span className="text-[10px] font-mono text-amber-400 font-normal">
+                  {selectedCamera.sensorFormat} · {selectedLens.projectionType}
+                </span>
+              </h3>
+
+              {/* Camera Selector */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-slate-400 font-medium">Camera Body:</label>
+                <div className="relative">
+                  <select
+                    value={selectedCamera.id}
+                    onChange={(e) => {
+                      const cam = cameras.find((c) => c.id === e.target.value);
+                      if (cam) setSelectedCamera(cam);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
+                  >
+                    {cameras.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.brand} {c.model} ({c.sensorFormat} · {c.megapixels} MP · {c.cropFactor.toFixed(1)}x)
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Lens Selector */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-slate-400 font-medium">Lens:</label>
+                <div className="relative">
+                  <select
+                    value={selectedLens.id}
+                    onChange={(e) => {
+                      const lens = lenses.find((l) => l.id === e.target.value);
+                      if (lens) setSelectedLens(lens);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
+                  >
+                    {lenses.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.brand} {l.model} ({l.focalLengthMinMm === l.focalLengthMaxMm ? `${l.focalLengthMinMm}mm` : `${l.focalLengthMinMm}-${l.focalLengthMaxMm}mm`} · {l.projectionType})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Panoramic Head Selector */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-slate-400 font-medium">Panoramic Tripod Head:</label>
+                <div className="relative">
+                  <select
+                    value={selectedPanoHead.id}
+                    onChange={(e) => {
+                      const head = panoHeads.find((h) => h.id === e.target.value);
+                      if (head) setSelectedPanoHead(head);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
+                  >
+                    {panoHeads.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.brand} {h.model} ({h.type} · {h.loadCapacity})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Nodal Point Shortcut Card in Advanced Mode */}
+              <div className="p-3 bg-amber-950/20 border border-amber-500/30 rounded-xl flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                    <Crosshair className="w-3.5 h-3.5" />
+                    <span>Nodal Point (NPP): {formatDualMm(upperRailOffsetMm || selectedLens.entrancePupilOffsetMm || 42)}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Upper rail mark for {selectedPanoHead.brand} {selectedPanoHead.model} to ensure parallax-free stitching.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveVisualizer('NODAL')}
+                  className="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition shrink-0 flex items-center gap-1 active:scale-95 shadow-sm"
+                  title="Open the dedicated Nodal Point calculation tool"
+                >
+                  <span>Nodal Tool</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              {/* Scenario Selector */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-slate-400 font-medium">Shooting Scenario:</label>
+                <div className="relative">
+                  <select
+                    value={selectedScenario.id}
+                    onChange={(e) => {
+                      const s = scenarios.find((sc) => sc.id === e.target.value);
+                      if (s) setSelectedScenario(s);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none pr-10"
+                  >
+                    {scenarios.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.category} · EV {s.lightLevelEv})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+                <p className="text-[11px] text-slate-400 px-1 leading-relaxed">
+                  {selectedScenario.description}
+                </p>
+              </div>
+            </div>
+
+            {/* Camera Mode Dial Selector & Advisory (Manual vs Tv vs Av vs Sports) */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Gauge className="w-4 h-4 text-amber-400" />
+                  <span>Camera Exposure Mode Dial</span>
+                </span>
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                  exposureDialMode === 'M'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                }`}>
+                  {exposureDialMode === 'M' ? 'GOLD STANDARD: MANUAL' : 'WARNING: NOT RECOMMENDED'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => setExposureDialMode('M')}
-                  className="self-start ml-5 mt-1 px-2.5 py-1 rounded bg-rose-500 text-white font-bold text-[10px]"
+                  className={`py-2 px-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center justify-center transition border ${
+                    exposureDialMode === 'M'
+                      ? 'bg-emerald-500 text-slate-950 font-black shadow-md border-emerald-400'
+                      : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                  }`}
                 >
-                  Switch back to Manual (M)
+                  <span>M (Manual)</span>
+                  <span className="text-[9px] opacity-80">Locked Best</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExposureDialMode('Tv')}
+                  className={`py-2 px-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center justify-center transition border ${
+                    exposureDialMode === 'Tv'
+                      ? 'bg-rose-500 text-white font-black shadow-md border-rose-400'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <span>Tv / S</span>
+                  <span className="text-[9px] opacity-80">Shutter Priority</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExposureDialMode('Av')}
+                  className={`py-2 px-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center justify-center transition border ${
+                    exposureDialMode === 'Av'
+                      ? 'bg-rose-500 text-white font-black shadow-md border-rose-400'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <span>Av / A</span>
+                  <span className="text-[9px] opacity-80">Aperture Priority</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExposureDialMode('AUTO_SPORTS')}
+                  className={`py-2 px-2 rounded-xl text-xs font-mono font-bold flex flex-col items-center justify-center transition border ${
+                    exposureDialMode === 'AUTO_SPORTS'
+                      ? 'bg-rose-500 text-white font-black shadow-md border-rose-400'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <span>Sports/Auto</span>
+                  <span className="text-[9px] opacity-80">Never Use</span>
                 </button>
               </div>
-            ) : exposureDialMode === 'Av' ? (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-amber-400">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Av (Aperture Priority) Warning:</span>
+
+              {exposureDialMode !== 'M' && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 leading-relaxed flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-white block font-bold mb-0.5">Critical Panorama Advisory:</strong>
+                    Do NOT shoot 360° panoramas in {exposureDialMode} mode! Auto-exposure changes shutter speed or aperture from shot to shot as you pan toward windows or sun, creating severe exposure banding across stitch seams that PTGui / Hugin cannot balance.
+                  </div>
                 </div>
-                <p className="text-[11px] leading-relaxed text-amber-200/90 pl-5">
-                  Av keeps aperture constant (good for DOF), but shifts shutter speed as you rotate toward lights and windows. This creates visible exposure steps between tiles. For high dynamic range scenes, use <strong>Manual (M) Mode with AEB (Auto Exposure Bracketing)</strong> instead.
-                </p>
-              </div>
-            ) : (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-xs flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-rose-400">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Sport / Auto Modes Completely Ruin Panoramas:</span>
+              )}
+            </div>
+
+            {/* Custom Optical Dials (Aperture & ISO Overrides) */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                <span>Manual Optical Dials (Overrides)</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomAperture(undefined);
+                    setCustomIso(undefined);
+                  }}
+                  className="text-[10px] font-mono text-amber-400 hover:text-amber-300 font-normal underline"
+                >
+                  Reset to Auto-Engine
+                </button>
+              </span>
+
+              {/* Aperture Dial */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Aperture Dial:</span>
+                  <span className="font-mono font-bold text-amber-400">
+                    {customAperture ? `f/${customAperture} (Manual Override)` : `Auto: f/${results.recommendedAperture} (Sweet Spot)`}
+                  </span>
                 </div>
-                <p className="text-[11px] leading-relaxed text-rose-200/90 pl-5">
-                  Sport modes activate Continuous Autofocus (AI Servo/AF-C) which continually shifts focus distance between frames, varies ISO unpredictably, and softens corners. Never shoot 360° panoramas in Auto or Sports modes.
-                </p>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {[2.8, 4, 5.6, 8, 11, 16].map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setCustomAperture(customAperture === f ? undefined : f)}
+                      className={`py-1.5 text-xs font-mono font-bold rounded-lg border transition ${
+                        customAperture === f
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : results.recommendedAperture === f && !customAperture
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      f/{f}
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Infinity Focus (∞) vs Hyperfocal Sharpness Analyzer Card */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <Focus className="w-4 h-4 text-emerald-400" />
-                <span>Infinity (∞) vs Hyperfocal Focus Setting</span>
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 font-bold">
-                H = {results.hyperfocalDistanceM.toFixed(2)}m
-              </span>
+              {/* ISO Dial */}
+              <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">ISO Dial:</span>
+                  <span className="font-mono font-bold text-amber-400">
+                    {customIso ? `ISO ${customIso} (Manual)` : `Auto: ISO ${results.recommendedIso}`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {[100, 200, 400, 800, 1600, 3200].map((iso) => (
+                    <button
+                      key={iso}
+                      type="button"
+                      onClick={() => setCustomIso(customIso === iso ? undefined : iso)}
+                      className={`py-1.5 text-xs font-mono font-bold rounded-lg border transition ${
+                        customIso === iso
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : results.recommendedIso === iso && !customIso
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {iso}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setFocusDistanceM(1.2)}
-                className={`p-2.5 rounded-xl border flex flex-col items-center justify-center transition ${
-                  Math.abs((focusDistanceM || results.focusDistanceM) - 1.2) < 0.1
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500 font-bold shadow'
-                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
-                }`}
-              >
-                <span className="text-[10px] text-slate-400">Safe Panorama</span>
-                <span className="text-sm font-bold text-emerald-400">~1.2 m</span>
-                <span className="text-[9px] text-slate-500">Sharp 0.33m → ∞</span>
-              </button>
+            {/* Rotator Detents & Shots Configuration */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <RotateCw className="w-4 h-4 text-amber-400" />
+                  <span>Rotator Detents (360° Shots)</span>
+                </span>
+                <span className="text-xs font-mono text-amber-400 font-bold">
+                  {results.shotsPerCircle} Shots @ {results.rotationIncrementDeg}°
+                </span>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setFocusDistanceM(results.hyperfocalDistanceM)}
-                className={`p-2.5 rounded-xl border flex flex-col items-center justify-center transition ${
-                  Math.abs((focusDistanceM || results.focusDistanceM) - results.hyperfocalDistanceM) < 0.1
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500 font-bold shadow'
-                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
-                }`}
-              >
-                <span className="text-[10px] text-slate-400">Hyperfocal (H)</span>
-                <span className="text-sm font-bold text-amber-400">{results.hyperfocalDistanceM.toFixed(2)} m</span>
-                <span className="text-[9px] text-slate-500">Sharp {results.hyperfocalNearLimitM.toFixed(2)}m → ∞</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFocusDistanceM(10.0)}
-                className={`p-2.5 rounded-xl border flex flex-col items-center justify-center transition ${
-                  (focusDistanceM || results.focusDistanceM) >= 9.0
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500 font-bold shadow'
-                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
-                }`}
-              >
-                <span className="text-[10px] text-slate-400">Infinity (∞ Mark)</span>
-                <span className="text-sm font-bold text-sky-400">∞ (Distant)</span>
-                <span className="text-[9px] text-slate-500">Near limit = {results.hyperfocalDistanceM.toFixed(1)}m</span>
-              </button>
-            </div>
-
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
-              <strong className="text-amber-400">Why NOT turn to the Infinity (∞) mark?</strong> Focusing directly at Infinity pushes your near sharp limit all the way out to {results.hyperfocalDistanceM.toFixed(2)}m, leaving foreground tables and floors unsharp! Focusing at ~1.2m or Hyperfocal ({results.hyperfocalDistanceM.toFixed(2)}m) keeps infinity tack-sharp while bringing foreground sharpness all the way in to {results.hyperfocalNearLimitM.toFixed(2)}m.
-            </div>
-          </div>
-
-          {/* Sliders: Distance, Focus, Overlap, Quality */}
-          <div className="flex flex-col gap-3">
-            {/* Subject Distance Slider */}
-            <SliderControl
-              label="Approximate Subject / Room Distance"
-              value={subjectDistanceM}
-              min={0.3}
-              max={15}
-              step={0.1}
-              unit="m"
-              displayValueOverride={formatDualDistance(subjectDistanceM)}
-              onChange={setSubjectDistanceM}
-              presetValues={[
-                { label: '0.5m (1.6ft)', value: 0.5 },
-                { label: '1m (3.3ft)', value: 1.0 },
-                { label: '1.5m (4.9ft)', value: 1.5 },
-                { label: '2m (6.6ft)', value: 2.0 },
-                { label: '3m (9.8ft)', value: 3.0 },
-                { label: '5m (16.4ft)', value: 5.0 },
-                { label: '10m (32.8ft)', value: 10.0 },
-              ]}
-              helperText="Distance to the nearest dominant furniture, doorway, or focal subject (Default: 0.5m / 1.64ft)."
-            />
-
-            {/* Overlap Slider */}
-            <SliderControl
-              label="Stitching Overlap"
-              value={Math.round(targetOverlapPct * 100)}
-              min={10}
-              max={55}
-              step={5}
-              unit="%"
-              badgeText={
-                targetOverlapPct < 0.20
-                  ? 'Minimal'
-                  : targetOverlapPct <= 0.35
-                  ? 'Recommended'
-                  : targetOverlapPct <= 0.45
-                  ? 'High'
-                  : 'Very High'
-              }
-              badgeColor={
-                targetOverlapPct < 0.20
-                  ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
-                  : targetOverlapPct <= 0.35
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                  : 'bg-sky-500/20 text-sky-400 border-sky-500/30'
-              }
-              onChange={(val) => setTargetOverlapPct(val / 100)}
-              presetValues={[
-                { label: '15%', value: 15 },
-                { label: '20%', value: 20 },
-                { label: '25%', value: 25 },
-                { label: '30%', value: 30 },
-                { label: '35%', value: 35 },
-                { label: '40%', value: 40 },
-                { label: '50%', value: 50 },
-              ]}
-              helperText="Recommended 20–35%. 35–45% is optimal for blank white walls and ceilings."
-            />
-
-            {/* Quality Priority Buttons */}
-            <div className="flex flex-col gap-1.5 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                Quality Priority
-              </span>
-              <div className="grid grid-cols-3 gap-2 mt-1">
-                {(['FAST', 'BALANCED', 'MAXIMUM_QUALITY'] as QualityPriority[]).map((p) => (
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { shots: 3, label: '3s (120°)' },
+                  { shots: 4, label: '4s (90°)' },
+                  { shots: 6, label: '6s (60°)' },
+                  { shots: 8, label: '8s (45°)' },
+                  { shots: 12, label: '12s (30°)' },
+                ].map((item) => (
                   <button
-                    key={p}
+                    key={item.shots}
                     type="button"
-                    onClick={() => setQualityPriority(p)}
-                    className={`py-2 px-2 rounded-lg text-xs font-mono font-bold transition ${
-                      qualityPriority === p
-                        ? 'bg-amber-500 text-slate-950 shadow-md'
-                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    onClick={() => setCustomShotsPerCircle(item.shots)}
+                    className={`py-1.5 px-1 rounded-xl text-xs font-mono font-bold transition border ${
+                      results.shotsPerCircle === item.shots
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
                     }`}
                   >
-                    {p === 'MAXIMUM_QUALITY' ? 'Max Quality' : p === 'BALANCED' ? 'Balanced' : 'Fast'}
+                    {item.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Advanced Controls (Aperture / ISO / Focus Overrides) */}
-            {mode === 'ADVANCED' && (
-              <div className="flex flex-col gap-3 p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
-                <div className="flex items-center justify-between text-xs font-bold text-amber-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-                  <span className="flex items-center gap-1.5">
-                    <Sliders className="w-4 h-4" />
-                    <span>Advanced Overrides & Fine Control</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomAperture(undefined);
-                      setCustomIso(undefined);
-                      setFocusDistanceM(undefined);
-                    }}
-                    className="text-[10px] text-slate-400 hover:text-amber-400 underline font-mono"
-                  >
-                    Reset Overrides
-                  </button>
-                </div>
-
-                {/* Aperture Slider Override */}
-                <SliderControl
-                  label="Aperture Manual Override"
-                  value={customAperture || results.recommendedAperture}
-                  min={2.8}
-                  max={22}
-                  step={0.5}
-                  displayValueOverride={`f/${customAperture || results.recommendedAperture}`}
-                  onChange={(val) => setCustomAperture(val)}
-                  presetValues={[
-                    { label: 'f/4', value: 4 },
-                    { label: 'f/5.6', value: 5.6 },
-                    { label: 'f/8', value: 8 },
-                    { label: 'f/11', value: 11 },
-                    { label: 'f/16', value: 16 },
-                  ]}
-                  helperText="Adjust to see diffraction vs depth of field shift in real time."
-                />
-
-                {/* Focus Distance Manual Override */}
-                <SliderControl
-                  label="Focus Distance Manual Override"
-                  value={focusDistanceM || results.focusDistanceM}
-                  min={0.3}
-                  max={10}
-                  step={0.1}
-                  unit="m"
-                  onChange={(val) => setFocusDistanceM(val)}
-                  presetValues={[
-                    { label: '0.5m', value: 0.5 },
-                    { label: '1m', value: 1 },
-                    { label: '1.2m', value: 1.2 },
-                    { label: '2m', value: 2 },
-                    { label: `H (${results.hyperfocalDistanceM.toFixed(1)}m)`, value: results.hyperfocalDistanceM },
-                  ]}
-                  helperText={`Hyperfocal distance: ${results.hyperfocalDistanceM.toFixed(2)}m (Near limit: ${results.hyperfocalNearLimitM.toFixed(2)}m)`}
-                />
-
-                {/* ISO Manual Override */}
-                <SliderControl
-                  label="ISO Manual Override"
-                  value={customIso || results.recommendedIso}
-                  min={50}
-                  max={6400}
-                  step={50}
-                  onChange={(val) => setCustomIso(val)}
-                  presetValues={[
-                    { label: '100', value: 100 },
-                    { label: '200', value: 200 },
-                    { label: '400', value: 400 },
-                    { label: '800', value: 800 },
-                    { label: '1600', value: 1600 },
-                  ]}
-                  helperText="Lower ISO delivers wider dynamic range and cleaner shadow extraction."
-                />
+            {/* HDR / AEB Bracketing Configuration Panel (Advanced Mode) */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span>HDR / AEB Exposure Bracketing</span>
+                </span>
+                <span className="text-xs font-mono text-sky-400 font-bold">
+                  {results.aebRecommended ? `${results.aebFrames} Frames @ ±${results.aebEvStep} EV` : 'Single Exposure'}
+                </span>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Right Column: Output Card & Visualizers (7 Cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          {/* Main Clean Result Card */}
-          <ResultCard
-            camera={selectedCamera}
-            lens={selectedLens}
-            scenario={selectedScenario}
-            results={results}
-            onSavePreset={() => setSaveModalOpen(true)}
-          />
+              {/* Frames Selector */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Bracket Frame Count:</span>
+                  <span className="font-mono text-slate-300 font-bold">
+                    {results.aebRecommended ? `${results.aebFrames} frames per stop` : '1 frame (Standard)'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { count: 1, label: 'Single (1)' },
+                    { count: 3, label: '3 Frames (Def)' },
+                    { count: 5, label: '5 Frames' },
+                    { count: 7, label: '7 Frames' },
+                  ].map((item) => (
+                    <button
+                      key={item.count}
+                      type="button"
+                      onClick={() => {
+                        if (item.count === 1) {
+                          setCustomAebEnabled(false);
+                          setCustomAebFrames(1);
+                        } else {
+                          setCustomAebEnabled(true);
+                          setCustomAebFrames(item.count);
+                        }
+                      }}
+                      className={`py-1.5 text-xs font-mono font-bold rounded-lg border transition ${
+                        (results.aebRecommended ? results.aebFrames : 1) === item.count
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Visualizer Tabs Header */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-                Interactive Panoramic Visualizers
-              </span>
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setActiveVisualizer('360')}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
-                    activeVisualizer === '360'
-                      ? 'bg-amber-500 text-slate-950 shadow'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>360° Rotator</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveVisualizer('ROWS')}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
-                    activeVisualizer === 'ROWS'
-                      ? 'bg-amber-500 text-slate-950 shadow'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>Vertical Tiers</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveVisualizer('PARALLAX')}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
-                    activeVisualizer === 'PARALLAX'
-                      ? 'bg-amber-500 text-slate-950 shadow'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Crosshair className="w-3.5 h-3.5" />
-                  <span>Parallax Check</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveVisualizer('EXPOSURE_AEB')}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
-                    activeVisualizer === 'EXPOSURE_AEB'
-                      ? 'bg-amber-500 text-slate-950 shadow'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Sun className="w-3.5 h-3.5" />
-                  <span>HDR / AEB</span>
-                </button>
+              {/* EV Step Selector */}
+              {results.aebRecommended && results.aebFrames > 1 && (
+                <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-800">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">EV Step Size:</span>
+                    <span className="font-mono text-slate-300 font-bold">±{results.aebEvStep} EV</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[1, 1.5, 2, 3].map((ev) => (
+                      <button
+                        key={ev}
+                        type="button"
+                        onClick={() => setCustomAebEvStep(ev)}
+                        className={`py-1.5 text-xs font-mono font-bold rounded-lg border transition ${
+                          results.aebEvStep === ev
+                            ? 'bg-sky-500 text-slate-950 border-sky-400 font-black shadow'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                        }`}
+                      >
+                        ±{ev} EV {ev === 2 ? '(Def)' : ''}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Calculated Shutter Bracket Breakdown Table */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col gap-1.5 text-[11px] font-mono">
+                <div className="text-[10px] text-slate-400 flex items-center justify-between border-b border-slate-800 pb-1">
+                  <span>FRAME BRACKET</span>
+                  <span>SHUTTER SPEED</span>
+                </div>
+                {results.bracketedFrames.map((frame) => (
+                  <div key={frame.index} className="flex items-center justify-between">
+                    <span className={frame.evOffset < 0 ? 'text-sky-400 font-bold' : frame.evOffset === 0 ? 'text-white font-bold' : 'text-amber-400 font-bold'}>
+                      Frame {frame.index} ({frame.evOffset > 0 ? `+${frame.evOffset}` : frame.evOffset} EV)
+                    </span>
+                    <span className="font-bold text-white">{frame.shutterFraction}</span>
+                  </div>
+                ))}
+                <div className="mt-1 pt-1.5 border-t border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
+                  <span>Dynamic Range: <strong className="text-sky-300">{results.totalDynamicRangeStops} EV</strong></span>
+                  <span>Total Tour Shots: <strong className="text-emerald-300">{results.totalRawShotsWithBracketing}</strong></span>
+                </div>
               </div>
             </div>
 
+            {/* Advanced Sliders: Distance & Overlap */}
+            <div className="flex flex-col gap-3">
+              <SliderControl
+                label="Approximate Subject / Room Distance"
+                value={subjectDistanceM}
+                min={0.3}
+                max={15}
+                step={0.1}
+                unit="m"
+                displayValueOverride={formatDualDistance(subjectDistanceM)}
+                onChange={setSubjectDistanceM}
+                presetValues={[
+                  { label: '0.5m (1.6ft)', value: 0.5 },
+                  { label: '1m (3.3ft)', value: 1.0 },
+                  { label: '1.5m (4.9ft)', value: 1.5 },
+                  { label: '2m (6.6ft)', value: 2.0 },
+                  { label: '3m (9.8ft)', value: 3.0 },
+                  { label: '5m (16.4ft)', value: 5.0 },
+                ]}
+                helperText="Distance to nearest dominant furniture or doorway (Default: 0.5m / 1.64ft)."
+              />
+
+              <SliderControl
+                label="Stitching Overlap"
+                value={Math.round(targetOverlapPct * 100)}
+                min={10}
+                max={55}
+                step={5}
+                unit="%"
+                badgeText={
+                  targetOverlapPct < 0.20
+                    ? 'Minimal'
+                    : targetOverlapPct <= 0.35
+                    ? 'Recommended'
+                    : 'High'
+                }
+                badgeColor="bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                onChange={(val) => setTargetOverlapPct(val / 100)}
+                presetValues={[
+                  { label: '20%', value: 20 },
+                  { label: '25%', value: 25 },
+                  { label: '30%', value: 30 },
+                  { label: '35%', value: 35 },
+                ]}
+              />
+            </div>
+          </div>
+
+          {/* Right Column: Calculations & Visualizer Tabs (7 Cols) */}
+          <div className="lg:col-span-7 flex flex-col gap-5">
+            {/* Visualizer Selector Tabs */}
+            <div className="flex items-center justify-between gap-1 p-1 bg-slate-900 border border-slate-800 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setActiveVisualizer('360')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition ${
+                  activeVisualizer === '360'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>360° Circle</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveVisualizer('ROWS')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition ${
+                  activeVisualizer === 'ROWS'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Vertical Rows</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveVisualizer('NODAL')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition ${
+                  activeVisualizer === 'NODAL'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Crosshair className="w-3.5 h-3.5" />
+                <span>Nodal Point Tool</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveVisualizer('EXPOSURE_AEB')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition ${
+                  activeVisualizer === 'EXPOSURE_AEB'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5" />
+                <span>AEB Histogram</span>
+              </button>
+            </div>
+
             {/* Active Visualizer Panel */}
-            {activeVisualizer === '360' && (
-              <PanoramaVisualizer360
-                shotsPerCircle={results.shotsPerCircle}
-                rotationIncrementDeg={results.rotationIncrementDeg}
-                effectiveHfovDeg={results.horizontalFovDeg}
-                overlapPct={results.overlapPct}
-                lensModel={selectedLens.model}
-                isFisheye={results.isFisheye}
-              />
-            )}
+            <div className="transition-all duration-200">
+              {activeVisualizer === '360' && (
+                <PanoramaVisualizer360
+                  shotsPerCircle={results.shotsPerCircle}
+                  rotationIncrementDeg={results.rotationIncrementDeg}
+                  effectiveHfovDeg={results.horizontalFovDeg}
+                  overlapPct={results.overlapPct}
+                  lensModel={selectedLens.model}
+                  isFisheye={results.isFisheye}
+                />
+              )}
 
-            {activeVisualizer === 'ROWS' && (
-              <VerticalRowVisualizer
-                numRows={results.numRows}
-                rowPitchesDeg={results.rowPitchesDeg}
-                shotsPerRow={results.shotsPerRow}
-                zenithShotRecommended={results.numRows > 1 || results.verticalFovDeg < 170}
-                nadirShotRecommended={results.nadirShotRecommended}
-                effectiveVfovDeg={results.verticalFovDeg}
-                totalShots={results.totalShots}
-              />
-            )}
+              {activeVisualizer === 'ROWS' && (
+                <VerticalRowVisualizer
+                  numRows={results.numRows}
+                  rowPitchesDeg={results.rowPitchesDeg}
+                  shotsPerRow={results.shotsPerRow}
+                  zenithShotRecommended={results.numRows > 1 || results.verticalFovDeg < 170}
+                  nadirShotRecommended={results.nadirShotRecommended}
+                  effectiveVfovDeg={results.verticalFovDeg}
+                  totalShots={results.totalShots}
+                />
+              )}
 
-            {activeVisualizer === 'PARALLAX' && (
-              <ParallaxVisualizer entrancePupilOffsetMm={selectedLens.entrancePupilOffsetMm} />
-            )}
+              {activeVisualizer === 'NODAL' && (
+                <NodalPointCalculator
+                  onApplied={() => {
+                    setNotification('Nodal point setting applied to active rig!');
+                    setTimeout(() => setNotification(null), 3000);
+                  }}
+                />
+              )}
 
-            {activeVisualizer === 'EXPOSURE_AEB' && (
-              <ExposureBracketingPanel />
-            )}
+              {activeVisualizer === 'EXPOSURE_AEB' && (
+                <ExposureBracketingPanel />
+              )}
+            </div>
+
+            {/* Comprehensive Result Card */}
+            <ResultCard
+              camera={selectedCamera}
+              lens={selectedLens}
+              scenario={selectedScenario}
+              results={results}
+              onSavePreset={handleOpenSaveModal}
+            />
           </div>
         </div>
-      </div>
+      )}
 
       {/* Save Setup Modal */}
       {saveModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-4">
-            <h3 className="text-lg font-bold text-white">Save Equipment Rig Preset</h3>
-            <p className="text-xs text-slate-400">
-              Save your current camera ({selectedCamera.model}), lens ({selectedLens.model}), and optical settings as a reusable 1-click rig.
-            </p>
-            <input
-              type="text"
-              placeholder={`e.g. Gazaly — ${selectedCamera.model} + ${selectedLens.model}`}
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setSaveModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveRig}
-                className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold hover:bg-amber-400 transition"
-              >
-                Save Preset
-              </button>
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 pb-2 border-b border-slate-800">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                <Bookmark className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Save Rig Preset to Section 10</h3>
+                <p className="text-xs text-slate-400">
+                  Save all optical calculations, camera, lens, and pano head settings into Section 10 (Saved Rigs).
+                </p>
+              </div>
             </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveRig();
+              }}
+              className="flex flex-col gap-3.5 text-xs font-mono"
+            >
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Preset Title:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder={`e.g. Gazaly — ${selectedCamera.model} + ${selectedLens.model}`}
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Field Notes / Scenario Notes (Optional):</label>
+                <textarea
+                  rows={2}
+                  value={presetDesc}
+                  onChange={(e) => setPresetDesc(e.target.value)}
+                  placeholder="e.g. Real estate interior golden setup, calibrated upper rail at 42mm..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-sans text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Rig Settings Preview */}
+              <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 text-[11px] grid grid-cols-2 gap-2 text-slate-300">
+                <div>
+                  <span className="text-slate-500 block">Camera:</span>
+                  <span className="font-bold text-white">{selectedCamera.brand} {selectedCamera.model}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Lens:</span>
+                  <span className="font-bold text-amber-400">{selectedLens.model} ({currentFocalLengthMm}mm)</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Pano Head:</span>
+                  <span className="font-bold text-white">{selectedPanoHead.brand} {selectedPanoHead.model}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Detents:</span>
+                  <span className="font-bold text-emerald-400">{results.shotsPerCircle} shots ({results.rotationIncrementDeg}°)</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Aperture & ISO:</span>
+                  <span className="font-bold text-white">{results.recommendedApertureString} · ISO {results.recommendedIso}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Stitching Overlap:</span>
+                  <span className="font-bold text-sky-400">{results.overlapPct}%</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSaveModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-black hover:bg-amber-400 transition shadow"
+                >
+                  Save Rig to Section 10
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
+
+      {/* Field Sheet PDF Modal */}
+      <FieldSheetPdfModal
+        isOpen={fieldSheetOpen}
+        onClose={() => setFieldSheetOpen(false)}
+        camera={selectedCamera}
+        lens={selectedLens}
+        panoHead={selectedPanoHead}
+        results={results}
+        shotsPerCircle={results.shotsPerCircle}
+        subjectDistanceM={subjectDistanceM}
+        upperRailMm={selectedLens.entrancePupilOffsetMm || 42}
+        lowerRailMm={52}
+        panoHeadName={`${selectedPanoHead.brand} ${selectedPanoHead.model}`}
+      />
     </div>
   );
 };

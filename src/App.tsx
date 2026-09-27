@@ -29,7 +29,9 @@ const AppContent: React.FC = () => {
       />
 
       <main className="flex-1 w-full">
-        {currentPage === 'optimizer' && <OptimizerPage />}
+        {currentPage === 'optimizer' && (
+          <OptimizerPage onNavigateToSaved={() => setCurrentPage('saved')} />
+        )}
         {currentPage === 'cameras' && (
           <CameraDatabasePage
             onNavigateToOptimizer={() => setCurrentPage('optimizer')}

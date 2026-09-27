@@ -61,10 +61,20 @@ body, lens projection type, and shooting scenario.
   calculates step angle, overlap percentage, safety ratings, and one-click
   auto-tuning for guaranteed seamless stitching.
 
+• Master Panoramic Tripod Head Database & Detent Engine:
+  Pre-loaded with 16 professional panoramic heads across 7 major manufacturers:
+  Fanotec / Nodal Ninja (NN3, NN4, NN6, R1/R10/R20, Ultimate M1/M2),
+  Manfrotto (303SPH, MH057A5/303), Bushman Panoramic (Gobi, Kalahari),
+  Novoflex (VR-System PRO II, VR-System Slant), Really Right Stuff (PG-02, PG-01),
+  Sunwayfoto (CR-3015/CR-30), Tom Shot 360, and 360Precision (Absolute/Adjuste).
+  Features 1-click auto-tuning that sets panorama shots, step angles, and rail
+  offsets directly to the hardware's native physical detent rings.
+
 • Panoramic Tripod Head Nodal Rail Calibration:
   Computes precise Upper Rail (No-Parallax Point / Entrance Pupil offset) and
   Lower Rail (sensor optical axis centering) settings in dual millimeters and
-  inches for popular panoramic heads (Nodal Ninja, Sunwayfoto, Leofoto, Bushman).
+  inches for popular panoramic heads. Includes specialized alignment modes for
+  cylindrical ring-clamp collars and 60° slant brackets.
 
 • Dual Standard Units Everywhere (Metric & Imperial):
   All measurements across every page, card, modal, and export display both
@@ -327,6 +337,16 @@ LENS SHEET COLUMNS:
 • Max Aperture              (e.g., 1.8, 2.8, 3.5, 4.0)
 • Entrance Pupil Offset (mm)(Distance from lens front/mount to NPP, e.g., 42.0)
 • Lens Mount                (e.g., Canon EF, Sony E, Micro Four Thirds)
+
+PANORAMIC HEADS SHEET COLUMNS:
+• Brand/Manufacturer        (e.g., Fanotec / Nodal Ninja, Manfrotto, Bushman, Novoflex)
+• Model                     (e.g., NN4, NN6, 303SPH, Gobi, VR-System PRO II)
+• Type                      (Multi-row Spherical, Single-row Ring Mount, Slant/Single-row)
+• Load Capacity             (e.g., ~1.5kg, ~3.5kg, 5kg, 8kg, Up to 10kg)
+• Rotator Detent Options    (e.g., Built-in click stops, 4, 6, 8, 10, 12, 15 stops)
+• Setup Method              (e.g., Sliding rails with mm scales, Lens collar clamp)
+• Camera/Lens Compatibility (e.g., Mirrorless, Pro DSLRs, Specific Fisheyes)
+• Status                    (Active, Legacy/Active, Legacy)
 
 
 7. SYSTEM ARCHITECTURE & TECHNOLOGY STACK

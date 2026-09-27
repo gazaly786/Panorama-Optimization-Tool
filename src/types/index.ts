@@ -116,6 +116,36 @@ export type QualityPriority = 'FAST' | 'BALANCED' | 'MAXIMUM_QUALITY';
 export type PanoramaCoverage = '360x180' | '360_cylindrical' | 'partial_horizontal' | 'custom';
 export type ExposureDialMode = 'M' | 'Tv' | 'Av' | 'P' | 'AUTO_SPORTS';
 
+export type PanoHeadType =
+  | 'Multi-row Spherical'
+  | 'Single-row Ring Mount'
+  | 'Single/Multi-row'
+  | 'Slant/Single-row'
+  | 'Multi-row Spherical Gigapixel'
+  | 'Multi-row Spherical (Gimbal type)'
+  | 'Multi-row Spherical / Single row'
+  | 'Multi-row / Single-row';
+
+export interface PanoHeadSpec {
+  id: string;
+  brand: string;
+  model: string;
+  type: PanoHeadType;
+  loadCapacity: string;
+  rotatorDetentOptions: string;
+  detentStopsDeg: number[];
+  supportedShots: number[];
+  setupMethod: string;
+  compatibility: string;
+  status: 'Active' | 'Legacy/Active' | 'Legacy';
+  lowerRailMaxMm: number;
+  upperRailMaxMm: number;
+  isRingClamp?: boolean;
+  isSlant?: boolean;
+  slantAngleDeg?: number;
+  provenance?: ProvenanceInfo;
+}
+
 export interface BracketedFrame {
   index: number;
   evOffset: number; // e.g. -2, 0, +2

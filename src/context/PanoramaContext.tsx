@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   CameraSpec,
   LensSpec,
+  PanoHeadSpec,
   PanoramaScenario,
   QualityPriority,
   UserRigPreset,
@@ -11,6 +12,7 @@ import {
 } from '../types';
 import { INITIAL_CAMERAS } from '../data/cameras';
 import { INITIAL_LENSES } from '../data/lenses';
+import { INITIAL_PANO_HEADS } from '../data/panoHeads';
 import { PANORAMA_SCENARIOS } from '../data/scenarios';
 import { optimizePanoramaSettings, OptimizerInputs } from '../calculations/recommendations';
 
@@ -18,12 +20,14 @@ interface PanoramaContextType {
   // Equipment lists
   cameras: CameraSpec[];
   lenses: LensSpec[];
+  panoHeads: PanoHeadSpec[];
   scenarios: PanoramaScenario[];
   savedSetups: UserRigPreset[];
 
   // Active selections
   selectedCamera: CameraSpec;
   selectedLens: LensSpec;
+  selectedPanoHead: PanoHeadSpec;
   selectedScenario: PanoramaScenario;
   currentFocalLengthMm: number;
   subjectDistanceM: number;
@@ -52,6 +56,7 @@ interface PanoramaContextType {
   // Setters
   setSelectedCamera: (camera: CameraSpec) => void;
   setSelectedLens: (lens: LensSpec) => void;
+  setSelectedPanoHead: (head: PanoHeadSpec) => void;
   setSelectedScenario: (scenario: PanoramaScenario) => void;
   setCurrentFocalLengthMm: (fl: number) => void;
   setSubjectDistanceM: (dist: number) => void;
@@ -69,6 +74,8 @@ interface PanoramaContextType {
   setCustomAebFrames: (frames?: number) => void;
   setCustomAebEvStep: (step?: number) => void;
   setCustomShotsPerCircle: (shots?: number) => void;
+  upperRailOffsetMm: number;
+  setUpperRailOffsetMm: (offset: number) => void;
 
   // Comparison actions
   toggleCameraComparison: (cameraId: string) => void;
@@ -81,13 +88,20 @@ interface PanoramaContextType {
   addLens: (lens: LensSpec) => void;
   updateLens: (lens: LensSpec) => void;
   deleteLens: (id: string) => void;
+  addPanoHead: (head: PanoHeadSpec) => void;
+  updatePanoHead: (head: PanoHeadSpec) => void;
+  deletePanoHead: (id: string) => void;
+  resetPanoHeadsToDefault: () => void;
+  applyPanoHeadRecommendedSettings: (head?: PanoHeadSpec) => void;
 
   // Preset operations
   saveCurrentSetup: (name: string, description?: string) => void;
   loadSetup: (preset: UserRigPreset) => void;
   deleteSetup: (id: string) => void;
+  clearAllSetups: () => void;
+  resetSetupsToDefault: () => void;
   exportDatabaseJson: () => string;
-  exportDatabaseCsv: () => { camerasCsv: string; lensesCsv: string };
+  exportDatabaseCsv: () => { camerasCsv: string; lensesCsv: string; panoHeadsCsv: string };
   importDatabaseJson: (jsonString: string) => boolean;
 
   // Theme
@@ -100,6 +114,7 @@ const PanoramaContext = createContext<PanoramaContextType | null>(null);
 const STORAGE_KEYS = {
   CAMERAS: 'pano_optix_cameras',
   LENSES: 'pano_optix_lenses',
+  PANO_HEADS: 'pano_optix_pano_heads',
   PRESETS: 'pano_optix_presets',
   THEME: 'pano_optix_theme',
   CURRENT_STATE: 'pano_optix_state',
@@ -120,7 +135,7 @@ const DEFAULT_PRESET: UserRigPreset = {
   overlapPct: 30,
   qualityPriority: 'MAXIMUM_QUALITY',
   tripodOn: true,
-  panoramicHeadModel: 'Nodal Ninja 4',
+  panoramicHeadModel: 'Manfrotto 303SPH',
   upperRailOffsetMm: 42,
   lowerRailOffsetMm: 52,
   createdAt: '2024-01-01T00:00:00.000Z',
@@ -156,7 +171,21 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return INITIAL_LENSES;
   });
 
-  // 3. Initialize Presets
+  // 3. Initialize Panoramic Heads Database
+  const [panoHeads, setPanoHeads] = useState<PanoHeadSpec[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.PANO_HEADS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to parse pano heads from local storage', e);
+    }
+    return INITIAL_PANO_HEADS;
+  });
+
+  // 4. Initialize Presets
   const [savedSetups, setSavedSetups] = useState<UserRigPreset[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.PRESETS);
@@ -170,13 +199,17 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return [DEFAULT_PRESET];
   });
 
-  // 4. Default selections: Canon 90D + Sigma 8mm Fisheye (Prompt requirement 6, 8, 78)
+  // 5. Default selections: Canon 90D + Sigma 8mm Fisheye + Nodal Ninja 4
   const [selectedCamera, setSelectedCameraState] = useState<CameraSpec>(() => {
     return cameras.find(c => c.id === 'canon-90d') || cameras[0];
   });
 
   const [selectedLens, setSelectedLensState] = useState<LensSpec>(() => {
     return lenses.find(l => l.id === 'sigma-8mm-f35-fisheye') || lenses[0];
+  });
+
+  const [selectedPanoHead, setSelectedPanoHeadState] = useState<PanoHeadSpec>(() => {
+    return panoHeads.find(h => h.id === 'manfrotto-303sph') || panoHeads.find(h => h.model.includes('303SPH')) || panoHeads[0] || INITIAL_PANO_HEADS[0];
   });
 
   const [selectedScenario, setSelectedScenario] = useState<PanoramaScenario>(() => {
@@ -195,10 +228,12 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [customCoCMm, setCustomCoCMm] = useState<number | undefined>(undefined);
   const [exposureDialMode, setExposureDialMode] = useState<ExposureDialMode>('M');
   const [customSceneEv, setCustomSceneEv] = useState<number | undefined>(undefined);
-  const [customAebEnabled, setCustomAebEnabled] = useState<boolean | undefined>(undefined);
-  const [customAebFrames, setCustomAebFrames] = useState<number | undefined>(undefined);
-  const [customAebEvStep, setCustomAebEvStep] = useState<number | undefined>(undefined);
-  const [customShotsPerCircle, setCustomShotsPerCircle] = useState<number | undefined>(undefined);
+  const [customAebEnabled, setCustomAebEnabled] = useState<boolean | undefined>(true);
+  const [customAebFrames, setCustomAebFrames] = useState<number | undefined>(3);
+  const [customAebEvStep, setCustomAebEvStep] = useState<number | undefined>(2);
+  const [customShotsPerCircle, setCustomShotsPerCircle] = useState<number | undefined>(4);
+  const [customUpperRailOffsetMm, setCustomUpperRailOffsetMm] = useState<number | undefined>(undefined);
+  const upperRailOffsetMm = customUpperRailOffsetMm ?? (selectedLens.entrancePupilOffsetMm || 42);
 
   // Comparison State
   const [comparisonCameraIds, setComparisonCameraIds] = useState<string[]>(['canon-90d', 'sony-a7iv']);
@@ -219,67 +254,36 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
-  // Sync to local storage
+  // Sync to Local Storage
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.CAMERAS, JSON.stringify(cameras));
-    } catch (e) {
-      console.error(e);
-    }
+    localStorage.setItem(STORAGE_KEYS.CAMERAS, JSON.stringify(cameras));
   }, [cameras]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.LENSES, JSON.stringify(lenses));
-    } catch (e) {
-      console.error(e);
-    }
+    localStorage.setItem(STORAGE_KEYS.LENSES, JSON.stringify(lenses));
   }, [lenses]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedSetups));
-    } catch (e) {
-      console.error(e);
-    }
+    localStorage.setItem(STORAGE_KEYS.PANO_HEADS, JSON.stringify(panoHeads));
+  }, [panoHeads]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedSetups));
   }, [savedSetups]);
 
-  // When selected lens changes, sync default focal length
-  const setSelectedLens = (lens: LensSpec) => {
-    setSelectedLensState(lens);
-    setCurrentFocalLengthMm(lens.focalLengthMinMm);
-  };
-
-  const setSelectedCamera = (camera: CameraSpec) => {
-    setSelectedCameraState(camera);
-  };
-
-  // Comparisons toggle
-  const toggleCameraComparison = (id: string) => {
-    setComparisonCameraIds(prev =>
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev.slice(-2), id]
-    );
-  };
-
-  const toggleLensComparison = (id: string) => {
-    setComparisonLensIds(prev =>
-      prev.includes(id) ? prev.filter(l => l !== id) : [...prev.slice(-2), id]
-    );
-  };
-
-  // Run calculation engine
-  const calculationInputs: OptimizerInputs = {
+  // Optical Calculations Engine Execution
+  const optimizerInputs: OptimizerInputs = {
     camera: selectedCamera,
     lens: selectedLens,
-    scenario: selectedScenario,
     focalLengthMm: currentFocalLengthMm,
+    scenario: selectedScenario,
     subjectDistanceM,
+    customFocusDistanceM: focusDistanceM,
+    customAperture,
+    customIso,
     targetOverlapPct,
     qualityPriority,
     tripodOn,
-    customAperture,
-    customIso,
-    customFocusDistanceM: focusDistanceM,
     customCoCMm,
     customSceneEv,
     customAebEnabled,
@@ -288,23 +292,106 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     customShotsPerCircle,
   };
 
-  const results = optimizePanoramaSettings(calculationInputs);
+  const results: OpticalCalculationResults = optimizePanoramaSettings(optimizerInputs);
 
-  // CRUD actions
+  // Setter Wrappers with Constraints
+  const setSelectedCamera = (camera: CameraSpec) => {
+    setSelectedCameraState(camera);
+  };
+
+  const setSelectedLens = (lens: LensSpec) => {
+    setSelectedLensState(lens);
+    if (currentFocalLengthMm < lens.focalLengthMinMm || currentFocalLengthMm > lens.focalLengthMaxMm) {
+      setCurrentFocalLengthMm(lens.focalLengthMinMm);
+    }
+  };
+
+  const applyPanoHeadRecommendedSettings = (headToApply?: PanoHeadSpec) => {
+    const head = headToApply || selectedPanoHead;
+    if (!head || !head.supportedShots || head.supportedShots.length === 0) return;
+
+    if (head.isSlant) {
+      // Slant head (e.g. Novoflex VR-System Slant): pre-angled 60° bracket optimized for 4 or 3 shots
+      const chosen = head.supportedShots.includes(4) ? 4 : head.supportedShots[0];
+      setCustomShotsPerCircle(chosen);
+      return;
+    }
+
+    if (head.isRingClamp) {
+      // Ring clamp (e.g. Fanotec R1/R10/R20 or Tom Shot 360)
+      let chosen = 4;
+      if (results.horizontalFovDeg >= 160 && head.supportedShots.includes(3)) {
+        chosen = 3;
+      } else if (results.horizontalFovDeg < 105 && head.supportedShots.includes(6)) {
+        chosen = 6;
+      } else if (head.supportedShots.includes(4)) {
+        chosen = 4;
+      } else {
+        chosen = head.supportedShots[0];
+      }
+      setCustomShotsPerCircle(chosen);
+      return;
+    }
+
+    // Standard multi-row or single-row spherical head:
+    // Determine minimum shots to guarantee adequate stitching overlap (>= 25%)
+    const effectiveHFOV = Math.max(15, results.horizontalFovDeg);
+    const targetOverlap = Math.max(0.20, targetOverlapPct);
+    const requiredShots = Math.ceil(360 / (effectiveHFOV * (1 - targetOverlap)));
+
+    // Find the smallest supported stop on this head that gives at least requiredShots
+    const validStops = [...head.supportedShots].sort((a, b) => a - b).filter(s => s >= requiredShots);
+    if (validStops.length > 0) {
+      setCustomShotsPerCircle(validStops[0]);
+    } else {
+      const maxShots = Math.max(...head.supportedShots);
+      setCustomShotsPerCircle(maxShots);
+    }
+  };
+
+  const setSelectedPanoHead = (head: PanoHeadSpec) => {
+    setSelectedPanoHeadState(head);
+    // Align panorama setting to this panohead's native detent stops
+    applyPanoHeadRecommendedSettings(head);
+  };
+
+  // Comparison Handlers
+  const toggleCameraComparison = (cameraId: string) => {
+    setComparisonCameraIds(prev =>
+      prev.includes(cameraId)
+        ? prev.filter(id => id !== cameraId)
+        : prev.length < 3
+        ? [...prev, cameraId]
+        : [prev[1], prev[2], cameraId]
+    );
+  };
+
+  const toggleLensComparison = (lensId: string) => {
+    setComparisonLensIds(prev =>
+      prev.includes(lensId)
+        ? prev.filter(id => id !== lensId)
+        : prev.length < 3
+        ? [...prev, lensId]
+        : [prev[1], prev[2], lensId]
+    );
+  };
+
+  // Database CRUD Handlers
   const addCamera = (cam: CameraSpec) => {
     setCameras(prev => [cam, ...prev]);
   };
 
   const updateCamera = (cam: CameraSpec) => {
     setCameras(prev => prev.map(c => (c.id === cam.id ? cam : c)));
-    if (selectedCamera.id === cam.id) setSelectedCameraState(cam);
+    if (selectedCamera.id === cam.id) {
+      setSelectedCameraState(cam);
+    }
   };
 
   const deleteCamera = (id: string) => {
     setCameras(prev => prev.filter(c => c.id !== id));
     if (selectedCamera.id === id) {
-      const remaining = cameras.filter(c => c.id !== id);
-      if (remaining.length > 0) setSelectedCameraState(remaining[0]);
+      setSelectedCameraState(cameras.find(c => c.id !== id) || INITIAL_CAMERAS[0]);
     }
   };
 
@@ -314,23 +401,47 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateLens = (lens: LensSpec) => {
     setLenses(prev => prev.map(l => (l.id === lens.id ? lens : l)));
-    if (selectedLens.id === lens.id) setSelectedLensState(lens);
+    if (selectedLens.id === lens.id) {
+      setSelectedLensState(lens);
+    }
   };
 
   const deleteLens = (id: string) => {
     setLenses(prev => prev.filter(l => l.id !== id));
     if (selectedLens.id === id) {
-      const remaining = lenses.filter(l => l.id !== id);
-      if (remaining.length > 0) setSelectedLensState(remaining[0]);
+      setSelectedLensState(lenses.find(l => l.id !== id) || INITIAL_LENSES[0]);
     }
   };
 
-  // Preset operations
+  const addPanoHead = (head: PanoHeadSpec) => {
+    setPanoHeads(prev => [head, ...prev]);
+  };
+
+  const updatePanoHead = (head: PanoHeadSpec) => {
+    setPanoHeads(prev => prev.map(h => (h.id === head.id ? head : h)));
+    if (selectedPanoHead.id === head.id) {
+      setSelectedPanoHeadState(head);
+    }
+  };
+
+  const deletePanoHead = (id: string) => {
+    setPanoHeads(prev => prev.filter(h => h.id !== id));
+    if (selectedPanoHead.id === id) {
+      setSelectedPanoHeadState(panoHeads.find(h => h.id !== id) || INITIAL_PANO_HEADS[0]);
+    }
+  };
+
+  const resetPanoHeadsToDefault = () => {
+    setPanoHeads(INITIAL_PANO_HEADS);
+    setSelectedPanoHeadState(INITIAL_PANO_HEADS[1] || INITIAL_PANO_HEADS[0]);
+  };
+
+  // Preset Handlers
   const saveCurrentSetup = (name: string, description?: string) => {
     const newPreset: UserRigPreset = {
-      id: `preset-${Date.now()}`,
-      name,
-      description,
+      id: `rig-${Date.now()}`,
+      name: name || `${selectedCamera.brand} ${selectedCamera.model} + ${selectedLens.brand} ${selectedLens.model}`,
+      description: description || `Optimized for ${selectedScenario.name}`,
       cameraId: selectedCamera.id,
       lensId: selectedLens.id,
       focalLengthMm: currentFocalLengthMm,
@@ -343,8 +454,8 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       overlapPct: results.overlapPct,
       qualityPriority,
       tripodOn,
-      panoramicHeadModel: 'Panoramic Head (Standard)',
-      upperRailOffsetMm: selectedLens.entrancePupilOffsetMm || 45,
+      panoramicHeadModel: selectedPanoHead.model,
+      upperRailOffsetMm: selectedLens.entrancePupilOffsetMm || 42,
       lowerRailOffsetMm: 52,
       customSceneEv,
       aebEnabled: customAebEnabled !== undefined ? customAebEnabled : results.aebRecommended,
@@ -364,6 +475,11 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (l) {
       setSelectedLensState(l);
       setCurrentFocalLengthMm(preset.focalLengthMm || l.focalLengthMinMm);
+    }
+
+    if (preset.panoramicHeadModel) {
+      const ph = panoHeads.find(h => h.model === preset.panoramicHeadModel || `${h.brand} ${h.model}` === preset.panoramicHeadModel);
+      if (ph) setSelectedPanoHeadState(ph);
     }
 
     const sc = PANORAMA_SCENARIOS.find(s => s.id === preset.scenarioId);
@@ -386,13 +502,22 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setSavedSetups(prev => prev.filter(p => p.id !== id));
   };
 
+  const clearAllSetups = () => {
+    setSavedSetups([]);
+  };
+
+  const resetSetupsToDefault = () => {
+    setSavedSetups([DEFAULT_PRESET]);
+  };
+
   const exportDatabaseJson = () => {
     const data = {
       cameras,
       lenses,
+      panoHeads,
       presets: savedSetups,
       exportedAt: new Date().toISOString(),
-      version: '1.0.0',
+      version: '2.4.0',
     };
     return JSON.stringify(data, null, 2);
   };
@@ -429,7 +554,18 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     ]);
     const lensesCsv = [lensHeaders.join(','), ...lensRows.map(r => r.join(','))].join('\n');
 
-    return { camerasCsv, lensesCsv };
+    // Generate CSV for panoramic heads
+    const panoHeaders = [
+      'Brand/Manufacturer', 'Model', 'Type', 'Load Capacity', 'Rotator Detent Options',
+      'Setup Method', 'Camera/Lens Compatibility', 'Status'
+    ];
+    const panoRows = panoHeads.map(h => [
+      `"${h.brand}"`, `"${h.model}"`, `"${h.type}"`, `"${h.loadCapacity}"`,
+      `"${h.rotatorDetentOptions}"`, `"${h.setupMethod}"`, `"${h.compatibility}"`, `"${h.status}"`
+    ]);
+    const panoHeadsCsv = [panoHeaders.join(','), ...panoRows.map(r => r.join(','))].join('\n');
+
+    return { camerasCsv, lensesCsv, panoHeadsCsv };
   };
 
   const importDatabaseJson = (jsonString: string): boolean => {
@@ -440,6 +576,9 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
       if (data.lenses && Array.isArray(data.lenses)) {
         setLenses(data.lenses);
+      }
+      if (data.panoHeads && Array.isArray(data.panoHeads)) {
+        setPanoHeads(data.panoHeads);
       }
       if (data.presets && Array.isArray(data.presets)) {
         setSavedSetups(data.presets);
@@ -456,10 +595,12 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         cameras,
         lenses,
+        panoHeads,
         scenarios: PANORAMA_SCENARIOS,
         savedSetups,
         selectedCamera,
         selectedLens,
+        selectedPanoHead,
         selectedScenario,
         currentFocalLengthMm,
         subjectDistanceM,
@@ -477,11 +618,13 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         customAebFrames,
         customAebEvStep,
         customShotsPerCircle,
+        upperRailOffsetMm,
         comparisonCameraIds,
         comparisonLensIds,
         results,
         setSelectedCamera,
         setSelectedLens,
+        setSelectedPanoHead,
         setSelectedScenario,
         setCurrentFocalLengthMm,
         setSubjectDistanceM,
@@ -499,6 +642,7 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setCustomAebFrames,
         setCustomAebEvStep,
         setCustomShotsPerCircle,
+        setUpperRailOffsetMm: (offset: number) => setCustomUpperRailOffsetMm(offset),
         toggleCameraComparison,
         toggleLensComparison,
         addCamera,
@@ -507,9 +651,16 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addLens,
         updateLens,
         deleteLens,
+        addPanoHead,
+        updatePanoHead,
+        deletePanoHead,
+        resetPanoHeadsToDefault,
+        applyPanoHeadRecommendedSettings,
         saveCurrentSetup,
         loadSetup,
         deleteSetup,
+        clearAllSetups,
+        resetSetupsToDefault,
         exportDatabaseJson,
         exportDatabaseCsv,
         importDatabaseJson,

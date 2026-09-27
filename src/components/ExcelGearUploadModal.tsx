@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { usePanorama } from '../context/PanoramaContext';
-import { CameraSpec, LensSpec } from '../types';
+import { CameraSpec, LensSpec, PanoHeadSpec } from '../types';
 import { parseExcelGearFile, downloadSampleExcelTemplate, ParseExcelResult } from '../utils/excelGearParser';
 import {
   FileSpreadsheet,
@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Info,
   RefreshCw,
+  Sliders,
 } from 'lucide-react';
 
 interface ExcelGearUploadModalProps {
@@ -25,7 +26,7 @@ interface ExcelGearUploadModalProps {
 }
 
 export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOpen, onClose }) => {
-  const { cameras, lenses, addCamera, addLens } = usePanorama();
+  const { cameras, lenses, panoHeads, addCamera, addLens, addPanoHead } = usePanorama();
 
   const [isCreatorMode, setIsCreatorMode] = useState<boolean>(true); // Gazaly Samsadeen
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -48,15 +49,17 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
       try {
         const buffer = e.target?.result as ArrayBuffer;
         if (buffer) {
-          const result = parseExcelGearFile(buffer, cameras, lenses, isCreatorMode);
+          const result = parseExcelGearFile(buffer, cameras, lenses, isCreatorMode, panoHeads);
           setParseResult(result);
         }
       } catch (err: any) {
         setParseResult({
           newCameras: [],
           newLenses: [],
+          newPanoHeads: [],
           skippedCameras: [],
           skippedLenses: [],
+          skippedPanoHeads: [],
           errors: [err.message || 'Failed to read file. Please ensure it is a valid Excel (.xlsx, .xls) or CSV file.'],
         });
       } finally {
@@ -68,8 +71,10 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
       setParseResult({
         newCameras: [],
         newLenses: [],
+        newPanoHeads: [],
         skippedCameras: [],
         skippedLenses: [],
+        skippedPanoHeads: [],
         errors: ['File reading error.'],
       });
     };
@@ -97,6 +102,13 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
       addLens(lens);
     });
 
+    // Add all non-existing panoramic heads
+    if (parseResult.newPanoHeads) {
+      parseResult.newPanoHeads.forEach((head) => {
+        addPanoHead(head);
+      });
+    }
+
     setImportSuccess(true);
     setTimeout(() => {
       setImportSuccess(false);
@@ -112,6 +124,9 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
       fileInputRef.current.value = '';
     }
   };
+
+  const totalNew = (parseResult?.newCameras.length || 0) + (parseResult?.newLenses.length || 0) + (parseResult?.newPanoHeads?.length || 0);
+  const totalSkipped = (parseResult?.skippedCameras.length || 0) + (parseResult?.skippedLenses.length || 0) + (parseResult?.skippedPanoHeads?.length || 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
@@ -130,7 +145,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Upload your camera and lens spreadsheet. Existing models are automatically skipped to preserve calibration.
+                Upload your cameras, lenses, and panoramic heads spreadsheet. Existing models are automatically skipped.
               </p>
             </div>
           </div>
@@ -195,7 +210,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
             <div className="flex items-center gap-2">
               <Download className="w-4 h-4 text-amber-400 shrink-0" />
               <span className="text-slate-300">
-                Need the official Excel template? Download pre-formatted <strong className="text-amber-300">Cameras & Lenses</strong> columns.
+                Need the official Excel template? Includes <strong className="text-amber-300">Cameras, Lenses & Panoramic Heads</strong> worksheets.
               </span>
             </div>
             <button
@@ -240,7 +255,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
                   Click to select your Excel file or drag & drop here
                 </span>
                 <span className="text-xs text-slate-400 block mt-1">
-                  Supports Microsoft Excel (.xlsx, .xls) and CSV sheets
+                  Supports Microsoft Excel (.xlsx, .xls) and CSV sheets (Cameras, Lenses, Panoramic Heads)
                 </span>
               </div>
 
@@ -257,7 +272,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
           {isProcessing && (
             <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
               <RefreshCw className="w-6 h-6 text-amber-400 animate-spin" />
-              <span className="text-xs font-mono">Analyzing Excel worksheets and mapping camera/lens specifications...</span>
+              <span className="text-xs font-mono">Analyzing Excel worksheets and mapping camera, lens, and pano head specifications...</span>
             </div>
           )}
 
@@ -281,7 +296,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
               </div>
 
               {/* Stats Counters */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center text-xs">
                 <div className="p-3 rounded-xl bg-slate-950 border border-emerald-500/20">
                   <span className="text-[10px] uppercase font-mono text-slate-500 block">New Cameras</span>
                   <span className="text-xl font-bold font-mono text-emerald-400 mt-0.5 block">
@@ -294,41 +309,35 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
                     +{parseResult.newLenses.length}
                   </span>
                 </div>
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-[10px] uppercase font-mono text-slate-500 block">Existing Cameras Skipped</span>
-                  <span className="text-xl font-bold font-mono text-slate-400 mt-0.5 block">
-                    {parseResult.skippedCameras.length}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-[10px] uppercase font-mono text-slate-500 block">Existing Lenses Skipped</span>
-                  <span className="text-xl font-bold font-mono text-slate-400 mt-0.5 block">
-                    {parseResult.skippedLenses.length}
+                <div className="p-3 rounded-xl bg-slate-950 border border-amber-500/20">
+                  <span className="text-[10px] uppercase font-mono text-slate-500 block">New Pano Heads</span>
+                  <span className="text-xl font-bold font-mono text-amber-400 mt-0.5 block">
+                    +{parseResult.newPanoHeads?.length || 0}
                   </span>
                 </div>
               </div>
 
               {/* Duplicate Notice */}
-              {(parseResult.skippedCameras.length > 0 || parseResult.skippedLenses.length > 0) && (
+              {totalSkipped > 0 && (
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
                   <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                   <div>
                     <span className="text-slate-200 font-semibold block">Deduplication Protection Active:</span>
                     <span>
-                      {parseResult.skippedCameras.length + parseResult.skippedLenses.length} items already exist in the database and will be preserved without modification. Only brand-new equipment will be appended.
+                      {totalSkipped} items already exist in the database and will be preserved without modification. Only brand-new equipment will be appended.
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* Preview of New Items */}
+              {/* Preview of New Cameras */}
               {parseResult.newCameras.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs font-mono font-bold text-slate-300 uppercase flex items-center gap-1.5">
                     <Camera className="w-3.5 h-3.5 text-emerald-400" />
                     <span>New Cameras to Add ({parseResult.newCameras.length}):</span>
                   </span>
-                  <div className="max-h-32 overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 divide-y divide-slate-800/60 p-1">
+                  <div className="max-h-28 overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 divide-y divide-slate-800/60 p-1">
                     {parseResult.newCameras.map((c, i) => (
                       <div key={i} className="px-3 py-1.5 flex items-center justify-between text-xs">
                         <span className="font-bold text-white">{c.brand} {c.model}</span>
@@ -339,18 +348,39 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
                 </div>
               )}
 
+              {/* Preview of New Lenses */}
               {parseResult.newLenses.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs font-mono font-bold text-slate-300 uppercase flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-sky-400" />
                     <span>New Lenses to Add ({parseResult.newLenses.length}):</span>
                   </span>
-                  <div className="max-h-32 overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 divide-y divide-slate-800/60 p-1">
+                  <div className="max-h-28 overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 divide-y divide-slate-800/60 p-1">
                     {parseResult.newLenses.map((l, i) => (
                       <div key={i} className="px-3 py-1.5 flex items-center justify-between text-xs">
                         <span className="font-bold text-white">{l.brand} {l.model}</span>
                         <span className="text-[11px] font-mono text-slate-400">
                           {l.focalLengthMinMm}mm · f/{l.maxAperture} · {l.projectionType}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview of New Pano Heads */}
+              {parseResult.newPanoHeads && parseResult.newPanoHeads.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-mono font-bold text-slate-300 uppercase flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                    <span>New Panoramic Heads to Add ({parseResult.newPanoHeads.length}):</span>
+                  </span>
+                  <div className="max-h-28 overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 divide-y divide-slate-800/60 p-1">
+                    {parseResult.newPanoHeads.map((h, i) => (
+                      <div key={i} className="px-3 py-1.5 flex items-center justify-between text-xs">
+                        <span className="font-bold text-white">{h.brand} {h.model}</span>
+                        <span className="text-[11px] font-mono text-slate-400">
+                          {h.type} · {h.loadCapacity}
                         </span>
                       </div>
                     ))}
@@ -376,7 +406,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2">
                   <CheckCircle className="w-4 h-4" />
                   <span>
-                    Successfully added {parseResult.newCameras.length} cameras and {parseResult.newLenses.length} lenses to the {isCreatorMode ? 'Master' : 'Local'} database!
+                    Successfully added {parseResult.newCameras.length} cameras, {parseResult.newLenses.length} lenses, and {parseResult.newPanoHeads?.length || 0} panoramic heads to the {isCreatorMode ? 'Master' : 'Local'} database!
                   </span>
                 </div>
               )}
@@ -399,14 +429,14 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
               Cancel
             </button>
 
-            {parseResult && (parseResult.newCameras.length > 0 || parseResult.newLenses.length > 0) && (
+            {parseResult && totalNew > 0 && (
               <button
                 type="button"
                 onClick={handleConfirmImport}
                 disabled={importSuccess}
                 className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-black transition shadow-lg flex items-center gap-1.5"
               >
-                <span>Confirm & Update Database</span>
+                <span>Confirm & Update Database ({totalNew} items)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}

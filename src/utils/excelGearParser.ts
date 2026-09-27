@@ -1,11 +1,13 @@
 import * as XLSX from 'xlsx';
-import { CameraSpec, LensSpec, SensorFormat, ProjectionType } from '../types';
+import { CameraSpec, LensSpec, SensorFormat, ProjectionType, PanoHeadSpec, PanoHeadType } from '../types';
 
 export interface ParseExcelResult {
   newCameras: CameraSpec[];
   newLenses: LensSpec[];
+  newPanoHeads: PanoHeadSpec[];
   skippedCameras: string[];
   skippedLenses: string[];
+  skippedPanoHeads: string[];
   errors: string[];
 }
 
@@ -49,20 +51,23 @@ function findValue(row: Record<string, any>, possibleKeys: string[]): any {
 }
 
 /**
- * Parses an Excel (.xlsx / .xls / .csv) file array buffer and returns extracted cameras and lenses.
+ * Parses an Excel (.xlsx / .xls / .csv) file array buffer and returns extracted cameras, lenses, and pano heads.
  * Automatically skips existing gear to prevent duplicates.
  */
 export function parseExcelGearFile(
   fileBuffer: ArrayBuffer,
   existingCameras: CameraSpec[],
   existingLenses: LensSpec[],
-  isCreatorMode = false
+  isCreatorMode = false,
+  existingPanoHeads: PanoHeadSpec[] = []
 ): ParseExcelResult {
   const workbook = XLSX.read(fileBuffer, { type: 'array' });
   const newCameras: CameraSpec[] = [];
   const newLenses: LensSpec[] = [];
+  const newPanoHeads: PanoHeadSpec[] = [];
   const skippedCameras: string[] = [];
   const skippedLenses: string[] = [];
+  const skippedPanoHeads: string[] = [];
   const errors: string[] = [];
 
   // Build existing lookup keys
@@ -71,6 +76,9 @@ export function parseExcelGearFile(
   );
   const existingLensKeys = new Set(
     existingLenses.map((l) => `${l.brand.trim().toLowerCase()}|${l.model.trim().toLowerCase()}`)
+  );
+  const existingHeadKeys = new Set(
+    existingPanoHeads.map((h) => `${h.brand.trim().toLowerCase()}|${h.model.trim().toLowerCase()}`)
   );
 
   workbook.SheetNames.forEach((sheetName) => {
@@ -89,11 +97,16 @@ export function parseExcelGearFile(
       lowerSheet.includes('len') ||
       lowerSheet.includes('optic') ||
       lowerSheet.includes('glass');
+    const isPanoHeadSheet =
+      lowerSheet.includes('head') ||
+      lowerSheet.includes('pano') ||
+      lowerSheet.includes('rotator') ||
+      lowerSheet.includes('mount');
 
     rows.forEach((row, rowIndex) => {
-      // Check if this row looks like a camera or lens
-      const brand = findValue(row, ['Brand', 'Make', 'Manufacturer', 'Company']);
-      const model = findValue(row, ['Model', 'Camera Model', 'Lens Model', 'Name', 'Gear Name']);
+      // Check if this row looks like gear
+      const brand = findValue(row, ['Brand/Manufacturer', 'Brand', 'Make', 'Manufacturer', 'Company']);
+      const model = findValue(row, ['Model', 'Camera Model', 'Lens Model', 'Name', 'Gear Name', 'Pano Head']);
 
       if (!brand || !model || String(brand).trim() === '' || String(model).trim() === '') {
         return; // skip empty or invalid rows
@@ -103,23 +116,85 @@ export function parseExcelGearFile(
       const modelStr = String(model).trim();
       const lookupKey = `${brandStr.toLowerCase()}|${modelStr.toLowerCase()}`;
 
-      // Check whether this row is a Camera or a Lens
+      // Check whether this row is a Pano Head, Lens, or Camera
+      const hasHeadIndicators =
+        findValue(row, ['Load Capacity', 'Rotator Detent Options', 'Rotator Detent', 'Setup Method', 'Camera/Lens Compatibility']) !== undefined;
       const hasLensIndicators =
         findValue(row, ['Focal Length', 'Focal Length Min', 'Aperture', 'Max Aperture', 'Projection', 'NPP', 'Entrance Pupil']) !== undefined;
       const hasCameraIndicators =
         findValue(row, ['Sensor Format', 'Megapixels', 'MP', 'Crop Factor', 'ISO', 'AEB']) !== undefined;
 
-      const treatAsLens = isLensSheet || (!isCameraSheet && hasLensIndicators && !hasCameraIndicators);
-      const treatAsCamera = isCameraSheet || (!isLensSheet && (hasCameraIndicators || !treatAsLens));
+      const treatAsHead = isPanoHeadSheet || (!isCameraSheet && !isLensSheet && hasHeadIndicators);
+      const treatAsLens = !treatAsHead && (isLensSheet || (!isCameraSheet && hasLensIndicators && !hasCameraIndicators));
+      const treatAsCamera = !treatAsHead && !treatAsLens && (isCameraSheet || hasCameraIndicators || true);
 
-      if (treatAsLens) {
+      if (treatAsHead) {
+        // Panoramic Head Processing
+        if (existingHeadKeys.has(lookupKey)) {
+          skippedPanoHeads.push(`${brandStr} ${modelStr}`);
+          return;
+        }
+
+        existingHeadKeys.add(lookupKey);
+
+        try {
+          const rawType = String(findValue(row, ['Type', 'Head Type', 'Pano Head Type']) || 'Multi-row Spherical');
+          const rawCapacity = String(findValue(row, ['Load Capacity', 'Capacity', 'Weight Limit']) || '~3.5kg');
+          const rawDetents = String(findValue(row, ['Rotator Detent Options', 'Rotator Detent', 'Detent Stops', 'Click Stops']) || 'Standard detents');
+          const rawSetup = String(findValue(row, ['Setup Method', 'Method', 'Setup']) || 'Sliding rails with mm scales');
+          const rawCompat = String(findValue(row, ['Camera/Lens Compatibility', 'Compatibility']) || 'Universal');
+          const rawStatus = String(findValue(row, ['Status', 'Active Status']) || 'Active');
+
+          const isRingClamp = rawType.toLowerCase().includes('ring') || modelStr.toLowerCase().includes('ring') || rawSetup.toLowerCase().includes('clamp');
+          const isSlant = rawType.toLowerCase().includes('slant') || modelStr.toLowerCase().includes('slant');
+
+          // Derive detent degrees from text or defaults
+          let detents: number[] = [90, 60, 45, 30];
+          if (rawDetents.includes('10, 15, 30, 45, 90') || rawDetents.includes('300N')) {
+            detents = [90, 45, 30, 15, 10];
+          } else if (rawDetents.includes('12, 15, 18, 20, 24')) {
+            detents = [30, 24, 20, 18, 15];
+          } else if (rawDetents.includes('3, 4, 6, 8')) {
+            detents = [120, 90, 60, 45];
+          } else if (isSlant) {
+            detents = [120, 90];
+          }
+
+          const headItem: PanoHeadSpec = {
+            id: `head-${normalizeKey(brandStr)}-${normalizeKey(modelStr)}-${Date.now()}`,
+            brand: brandStr,
+            model: modelStr,
+            type: rawType as PanoHeadType,
+            loadCapacity: rawCapacity,
+            rotatorDetentOptions: rawDetents,
+            detentStopsDeg: detents,
+            supportedShots: detents.map(d => Math.round(360 / d)),
+            setupMethod: rawSetup,
+            compatibility: rawCompat,
+            status: rawStatus.includes('Legacy') && !rawStatus.includes('Active') ? 'Legacy' : rawStatus.includes('Legacy/Active') ? 'Legacy/Active' : 'Active',
+            lowerRailMaxMm: isRingClamp ? 0 : 130,
+            upperRailMaxMm: isRingClamp ? 0 : 150,
+            isRingClamp,
+            isSlant,
+            provenance: {
+              source: isCreatorMode ? 'Gazaly Samsadeen Curated Master Database (Excel)' : 'User Excel Import (Local Device)',
+              status: isCreatorMode ? 'MANUFACTURER DATA' : 'USER VERIFIED',
+              confidence: 'HIGH',
+              dateVerified: new Date().toISOString().split('T')[0],
+            },
+          };
+
+          newPanoHeads.push(headItem);
+        } catch (err: any) {
+          errors.push(`Row ${rowIndex + 1} (Pano Head ${modelStr}): ${err.message || 'Parse error'}`);
+        }
+      } else if (treatAsLens) {
         // Lens Processing
         if (existingLensKeys.has(lookupKey)) {
           skippedLenses.push(`${brandStr} ${modelStr}`);
           return;
         }
 
-        // Add to avoid duplicates within the same sheet
         existingLensKeys.add(lookupKey);
 
         try {
@@ -180,7 +255,6 @@ export function parseExcelGearFile(
           return;
         }
 
-        // Add to avoid duplicates within the same sheet
         existingCamKeys.add(lookupKey);
 
         try {
@@ -252,15 +326,17 @@ export function parseExcelGearFile(
   return {
     newCameras,
     newLenses,
+    newPanoHeads,
     skippedCameras,
     skippedLenses,
+    skippedPanoHeads,
     errors,
   };
 }
 
 /**
  * Generates and downloads a clean, beautifully formatted sample Excel (.xlsx) template
- * with sample Cameras and Lenses sheets for the user to fill and import.
+ * with sample Cameras, Lenses, and Panoramic Heads sheets.
  */
 export function downloadSampleExcelTemplate(): void {
   const cameraHeaders = [
@@ -339,24 +415,179 @@ export function downloadSampleExcelTemplate(): void {
       'Entrance Pupil Offset (mm)': 68.0,
       'Lens Mount': 'Canon RF',
     },
+  ];
+
+  const panoHeadHeaders = [
     {
-      Brand: 'Sony',
-      Model: 'FE 14mm f/1.8 GM',
-      'Projection Type': 'rectilinear',
-      'Focal Length Min (mm)': 14,
-      'Focal Length Max (mm)': 14,
-      'Max Aperture': 1.8,
-      'Entrance Pupil Offset (mm)': 54.0,
-      'Lens Mount': 'Sony E',
+      'Brand/Manufacturer': 'Fanotec / Nodal Ninja',
+      Model: 'NN3 MKII/MK3',
+      Type: 'Multi-row Spherical',
+      'Load Capacity': '~1.5kg',
+      'Rotator Detent Options': 'Interchangeable detent rings (e.g. 4, 6, 8, 10, 12 stops)',
+      'Setup Method': 'Sliding rails with mm scales for no-parallax point (NPP)',
+      'Camera/Lens Compatibility': 'Compact and Mirrorless cameras',
+      Status: 'Legacy/Active',
+    },
+    {
+      'Brand/Manufacturer': 'Fanotec / Nodal Ninja',
+      Model: 'NN4',
+      Type: 'Multi-row Spherical',
+      'Load Capacity': '~3.5kg',
+      'Rotator Detent Options': 'Interchangeable detent rings or advanced rotator',
+      'Setup Method': 'Sliding rails with mm scales',
+      'Camera/Lens Compatibility': 'Standard DSLRs with standard/wide lenses',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Fanotec / Nodal Ninja',
+      Model: 'NN6',
+      Type: 'Multi-row Spherical',
+      'Load Capacity': 'Advanced load handling',
+      'Rotator Detent Options': 'RD10/RD16/RD8 Advanced Rotators (click stops switchable on the fly)',
+      'Setup Method': 'Sliding rails',
+      'Camera/Lens Compatibility': 'DSLR and heavy setups',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Fanotec / Nodal Ninja',
+      Model: 'R1 / R10 / R20 Series',
+      Type: 'Single-row Ring Mount',
+      'Load Capacity': 'Lens specific',
+      'Rotator Detent Options': 'Mini rotator with fixed or adjustable click stops',
+      'Setup Method': 'Lens ring clamp with fixed offset for specific fisheye lenses',
+      'Camera/Lens Compatibility': 'Specific circular/full-frame fisheye lenses (e.g., Samyang 8mm, Sigma 8mm)',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Fanotec / Nodal Ninja',
+      Model: 'Ultimate M1 / M2',
+      Type: 'Multi-row Spherical Gigapixel',
+      'Load Capacity': 'Up to 10kg',
+      'Rotator Detent Options': 'Heavy duty RD series rotators',
+      'Setup Method': 'Geared or sliding rails',
+      'Camera/Lens Compatibility': 'Telephoto lenses, large heavy camera systems',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Manfrotto',
+      Model: '303SPH',
+      Type: 'Multi-row Spherical',
+      'Load Capacity': '~4kg',
+      'Rotator Detent Options': '300N rotation unit with selectable click stops (10, 15, 30, 45, 90 degrees)',
+      'Setup Method': 'Sliding plates with etched mm scales',
+      'Camera/Lens Compatibility': 'DSLR medium to heavy',
+      Status: 'Active/Legacy',
+    },
+    {
+      'Brand/Manufacturer': 'Manfrotto',
+      Model: 'MH057A5 / 303',
+      Type: 'Single/Multi-row',
+      'Load Capacity': '5kg',
+      'Rotator Detent Options': 'Built-in click stops',
+      'Setup Method': 'Micro-positioning sliding plates',
+      'Camera/Lens Compatibility': 'Pro DSLRs',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Bushman Panoramic',
+      Model: 'Gobi',
+      Type: 'Multi-row Spherical',
+      'Load Capacity': '1.9kg',
+      'Rotator Detent Options': 'Built-in rotator with selectable click stops (12, 15, 18, 20, 24 stops)',
+      'Setup Method': 'Compact sliding rails',
+      'Camera/Lens Compatibility': 'Mirrorless, lightweight DSLRs. Extremely compact.',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Bushman Panoramic',
+      Model: 'Kalahari',
+      Type: 'Multi-row Spherical',
+      'Load Capacity': '~3kg',
+      'Rotator Detent Options': 'Built-in click stops',
+      'Setup Method': 'Sliding rails',
+      'Camera/Lens Compatibility': 'Standard DSLRs',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Novoflex',
+      Model: 'VR-System PRO II',
+      Type: 'Multi-row Spherical',
+      'Load Capacity': 'Heavy duty',
+      'Rotator Detent Options': 'Panorama=Q PRO rotator with selectable stops',
+      'Setup Method': 'Arca-compatible sliding rails',
+      'Camera/Lens Compatibility': 'Professional DSLRs',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Novoflex',
+      Model: 'VR-System Slant',
+      Type: 'Slant/Single-row',
+      'Load Capacity': 'Light/Medium',
+      'Rotator Detent Options': 'Click stop rotator',
+      'Setup Method': 'Pre-angled at 60 degrees (requires fewer shots for spherical pano)',
+      'Camera/Lens Compatibility': 'Fisheye lenses',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Really Right Stuff (RRS)',
+      Model: 'PG-02',
+      Type: 'Multi-row Spherical (Gimbal type)',
+      'Load Capacity': 'Heavy Duty (22kg+)',
+      'Rotator Detent Options': 'Panning base with degree markings (requires separate leveling/indexing base for click stops like PC-LR)',
+      'Setup Method': 'Precision sliding rails with laser-engraved scales',
+      'Camera/Lens Compatibility': 'Heavy Pro DSLRs',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Really Right Stuff (RRS)',
+      Model: 'PG-01',
+      Type: 'Multi-row Spherical / Single row',
+      'Load Capacity': '3.6kg',
+      'Rotator Detent Options': 'Panning base (indexing optional)',
+      'Setup Method': 'Compact sliding rails',
+      'Camera/Lens Compatibility': 'Mirrorless',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Sunwayfoto',
+      Model: 'CR-3015 / CR-30',
+      Type: 'Multi-row Spherical',
+      'Load Capacity': '8kg',
+      'Rotator Detent Options': 'Indexing Rotator (IRC-64 or similar) with multiple detent intervals',
+      'Setup Method': 'Arca-Swiss compatible sliding rails with scales',
+      'Camera/Lens Compatibility': 'DSLRs',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': 'Tom Shot 360',
+      Model: 'Tom Shot 360',
+      Type: 'Single-row Ring mount',
+      'Load Capacity': 'Lightweight',
+      'Rotator Detent Options': 'Compact detent rotator',
+      'Setup Method': 'Lens clamp set to specific lens NPP',
+      'Camera/Lens Compatibility': 'Specific fisheye lenses',
+      Status: 'Active',
+    },
+    {
+      'Brand/Manufacturer': '360Precision',
+      Model: 'Absolute / Adjuste',
+      Type: 'Multi-row / Single-row',
+      'Load Capacity': 'High',
+      'Rotator Detent Options': 'Precision machined detents',
+      'Setup Method': 'Some models are custom-machined for specific camera/lens combinations (no adjustment needed), Adjuste has rails',
+      'Camera/Lens Compatibility': 'Pro DSLRs',
+      Status: 'Legacy',
     },
   ];
 
   const wb = XLSX.utils.book_new();
   const wsCameras = XLSX.utils.json_to_sheet(cameraHeaders);
   const wsLenses = XLSX.utils.json_to_sheet(lensHeaders);
+  const wsHeads = XLSX.utils.json_to_sheet(panoHeadHeaders);
 
   XLSX.utils.book_append_sheet(wb, wsCameras, 'Cameras');
   XLSX.utils.book_append_sheet(wb, wsLenses, 'Lenses');
+  XLSX.utils.book_append_sheet(wb, wsHeads, 'Panoramic Heads');
 
   XLSX.writeFile(wb, 'PanoOptix_Gear_Database_Template_By_Gazaly_Samsadeen.xlsx');
 }

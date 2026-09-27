@@ -146,13 +146,8 @@ export function optimizePanoramaSettings(inputs: OptimizerInputs): OpticalCalcul
 
   if (inputs.customAebFrames === undefined) {
     if (aebRecommended) {
-      if (qualityPriority === 'MAXIMUM_QUALITY') {
-        aebFrames = Math.min(camera.maxAebFrameCount >= 5 ? 5 : 3, 5);
-        aebEvStep = Math.min(camera.maxAebRangeEv >= 2 ? 2 : 1, 2);
-      } else {
-        aebFrames = 3;
-        aebEvStep = Math.min(camera.maxAebRangeEv >= 2 ? 2 : 1, 2);
-      }
+      aebFrames = 3;
+      aebEvStep = Math.min(camera.maxAebRangeEv >= 2 ? 2 : 1, 2);
     } else {
       aebFrames = 1;
     }

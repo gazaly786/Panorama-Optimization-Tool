@@ -8,20 +8,17 @@ import {
   formatDualDistance,
   formatDualDimensions,
   formatDetentAngles,
-  mmToInches,
 } from '../utils/units';
 import {
   Wrench,
   Camera,
   Layers,
-  Crosshair,
   Sliders,
-  CheckCircle,
-  Save,
-  ArrowRight,
-  ShieldCheck,
-  AlertTriangle,
+  Crosshair,
   Printer,
+  Save,
+  CheckCircle,
+  ArrowRight,
   Sparkles,
   RotateCw,
   Compass,
@@ -29,16 +26,10 @@ import {
   HelpCircle,
   Check,
   FileSpreadsheet,
+  Shield,
+  Info,
 } from 'lucide-react';
-
-const POPULAR_PANO_HEADS = [
-  { name: 'Nodal Ninja 4 (Fanotec)', lowerRailMaxMm: 120, upperRailMaxMm: 140, clickStops: [90, 60, 45, 36, 30] },
-  { name: 'Nodal Ninja 3 MKII', lowerRailMaxMm: 100, upperRailMaxMm: 120, clickStops: [90, 60, 45, 30] },
-  { name: 'Nodal Ninja 6', lowerRailMaxMm: 140, upperRailMaxMm: 160, clickStops: [90, 60, 45, 36, 30, 24, 20] },
-  { name: 'Leofoto PAN-02 / Bushman', lowerRailMaxMm: 110, upperRailMaxMm: 130, clickStops: [90, 60, 45, 30] },
-  { name: 'Sunwayfoto CR-30', lowerRailMaxMm: 110, upperRailMaxMm: 120, clickStops: [90, 60, 45, 30] },
-  { name: 'Custom Panoramic Head', lowerRailMaxMm: 150, upperRailMaxMm: 150, clickStops: [90, 60, 45, 36, 30] },
-];
+import { PanoHeadSpec } from '../types';
 
 const PRESET_SHOT_COUNTS = [
   { shots: 3, label: '3 Shots (120°)', tag: 'Ultra Fisheye' },
@@ -57,10 +48,13 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
   const {
     cameras,
     lenses,
+    panoHeads,
     selectedCamera,
     selectedLens,
+    selectedPanoHead,
     setSelectedCamera,
     setSelectedLens,
+    setSelectedPanoHead,
     results,
     saveCurrentSetup,
     subjectDistanceM,
@@ -71,7 +65,6 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
     setCustomAperture,
   } = usePanorama();
 
-  const [selectedPanoHead, setSelectedPanoHead] = useState(POPULAR_PANO_HEADS[0]);
   const [rigName, setRigName] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
@@ -82,12 +75,19 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
 
   // Always use the standard 0.5m default distance
   const activeDistance = subjectDistanceM !== undefined ? subjectDistanceM : 0.5;
-  const nodal = calculateNodalAlignment(selectedCamera, selectedLens, activeDistance);
+  const nodal = calculateNodalAlignment(selectedCamera, selectedLens, activeDistance, selectedPanoHead);
 
   // Live calculations for current slider shots count
   const stepAngle = Math.round((360 / currentShots) * 10) / 10;
   const liveOverlapPct = Math.round((1 - (stepAngle / Math.max(10, results.horizontalFovDeg))) * 100);
   const detentSequence = formatDetentAngles(currentShots);
+
+  // Group panoramic heads by brand
+  const groupedPanoHeads = panoHeads.reduce<Record<string, PanoHeadSpec[]>>((acc, head) => {
+    if (!acc[head.brand]) acc[head.brand] = [];
+    acc[head.brand].push(head);
+    return acc;
+  }, {});
 
   // Overlap assessment
   let overlapBadgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
@@ -110,15 +110,20 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
 
   // 1-Click Super Panorama Auto-Tune
   const handleAutoTuneSuperOutput = () => {
-    // If current lens is wide fisheye (>=120° HFOV), 4 to 6 shots is the gold standard
+    // If panohead has supportedShots, prioritize those
+    const supported = selectedPanoHead.supportedShots || [];
+
     if (results.horizontalFovDeg >= 120) {
-      setCustomShotsPerCircle(4);
+      const best = supported.includes(4) ? 4 : (supported.includes(6) ? 6 : (supported[0] || 4));
+      setCustomShotsPerCircle(best);
       setTargetOverlapPct(0.30);
     } else if (results.horizontalFovDeg >= 80) {
-      setCustomShotsPerCircle(6);
+      const best = supported.includes(6) ? 6 : (supported.includes(8) ? 8 : (supported[0] || 6));
+      setCustomShotsPerCircle(best);
       setTargetOverlapPct(0.30);
     } else {
-      setCustomShotsPerCircle(12);
+      const best = supported.includes(12) ? 12 : (supported.includes(16) ? 16 : (supported[0] || 12));
+      setCustomShotsPerCircle(best);
       setTargetOverlapPct(0.30);
     }
     setSubjectDistanceM(0.5); // enforce standard 0.5m default
@@ -129,10 +134,10 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
     e.preventDefault();
     const finalName =
       rigName.trim() ||
-      `${selectedCamera.model} + ${selectedLens.model} (${currentShots}-Shot ${selectedPanoHead.name.split(' ')[0]})`;
+      `${selectedCamera.model} + ${selectedLens.model} (${currentShots}-Shot ${selectedPanoHead.model})`;
     saveCurrentSetup(
       finalName,
-      `Configured with ${selectedPanoHead.name}, ${currentShots} shots around (${stepAngle}°), Upper rail: ${formatDualMm(nodal.upperRailSettingMm)}, Lower rail: ${formatDualMm(nodal.lowerRailSettingMm)}`
+      `Configured with ${selectedPanoHead.brand} ${selectedPanoHead.model}, ${currentShots} shots around (${stepAngle}°), Upper rail: ${formatDualMm(nodal.upperRailSettingMm)}, Lower rail: ${formatDualMm(nodal.lowerRailSettingMm)}`
     );
     setSavedSuccess(true);
     setRigName('');
@@ -149,7 +154,7 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
             <h1 className="text-2xl font-black text-white">Equipment Builder & Rig Configurator</h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Pair camera bodies, fisheye/rectilinear lenses, and panoramic heads. Generates field-ready rail calibrations, rotator steps, and printable PDF field demographic sheets.
+            Pair camera bodies, fisheye/rectilinear lenses, and calibrated panoramic heads. Automatically sets rail positions, click stops, and demographic field sheets.
           </p>
         </div>
 
@@ -230,23 +235,124 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
               </select>
             </div>
 
-            {/* Panoramic Head Selection */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-slate-400 font-medium">Select Panoramic Head Model:</label>
+            {/* Panoramic Head Selection with Master Database */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-slate-400 font-medium">
+                  Select Panoramic Tripod Head:
+                </label>
+                <span className="text-[10px] font-mono text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                  {panoHeads.length} Models in Database
+                </span>
+              </div>
+
               <select
-                value={selectedPanoHead.name}
+                value={selectedPanoHead.id}
                 onChange={(e) => {
-                  const head = POPULAR_PANO_HEADS.find((h) => h.name === e.target.value);
+                  const head = panoHeads.find((h) => h.id === e.target.value);
                   if (head) setSelectedPanoHead(head);
                 }}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
-                {POPULAR_PANO_HEADS.map((h) => (
-                  <option key={h.name} value={h.name}>
-                    {h.name}
-                  </option>
+                {Object.entries(groupedPanoHeads).map(([brand, heads]) => (
+                  <optgroup key={brand} label={brand} className="bg-slate-900 text-white font-semibold">
+                    {heads.map((h) => (
+                      <option key={h.id} value={h.id} className="bg-slate-950 text-slate-200">
+                        {h.brand} — {h.model} ({h.type} · {h.loadCapacity})
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
+
+              {/* Panoramic Head Specification Card */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs flex flex-col gap-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-white text-sm">
+                        {selectedPanoHead.brand} {selectedPanoHead.model}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        {selectedPanoHead.type}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">
+                        Load: {selectedPanoHead.loadCapacity}
+                      </span>
+                      {selectedPanoHead.status && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                          selectedPanoHead.status.includes('Active')
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {selectedPanoHead.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
+                  <div>
+                    <span className="text-slate-500 block font-mono">Rotator Detent Options:</span>
+                    <span className="text-slate-200 font-medium">{selectedPanoHead.rotatorDetentOptions}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block font-mono">Setup Method:</span>
+                    <span className="text-slate-200 font-medium">{selectedPanoHead.setupMethod}</span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-400">
+                  <span className="text-slate-500 font-mono">Compatibility: </span>
+                  <span className="text-slate-300">{selectedPanoHead.compatibility}</span>
+                </div>
+
+                {/* Available Native Click-Stop Chips */}
+                {selectedPanoHead.detentStopsDeg && selectedPanoHead.detentStopsDeg.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    <span className="text-[10px] font-mono text-slate-500">Native Stops:</span>
+                    {selectedPanoHead.detentStopsDeg.map((deg, idx) => {
+                      const shots = Math.round(360 / deg);
+                      const isSelected = currentShots === shots;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleShotsChange(shots)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition ${
+                            isSelected
+                              ? 'bg-amber-500 text-slate-950 border-amber-400'
+                              : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-600'
+                          }`}
+                          title={`Click to set ${shots} shots around 360° (${deg}° click stop)`}
+                        >
+                          {deg}° ({shots}s)
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Special Mount Notices */}
+                {selectedPanoHead.isRingClamp && (
+                  <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-300 text-[11px] flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      <strong>Fixed Ring Mount:</strong> The lens collar clamp sets the no-parallax point (NPP) automatically at the lens nodal ring. No rail adjustments needed.
+                    </span>
+                  </div>
+                )}
+
+                {selectedPanoHead.isSlant && (
+                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      <strong>60° Slant Elevation:</strong> Angled bracket projects the diagonal field of view into the zenith and nadir, requiring only 3–4 shots for full spherical coverage.
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Optical Demographics Summary with Dual Units */}
@@ -294,7 +400,7 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
             </div>
 
             <p className="text-xs text-slate-400">
-              Select how many shots to take around the 360° circle. For example, <strong>4 Shots</strong> covers 4 sides with 90° rotation intervals. Other settings (overlap, detents, total exposures) automatically adapt to guarantee seamless stitching.
+              Select how many shots to take around the 360° circle. For example, <strong>4 Shots</strong> covers 4 sides with 90° rotation intervals. Settings adapt according to <strong>{selectedPanoHead.model}</strong> click stops.
             </p>
 
             {/* Shots Slider Control */}
@@ -336,21 +442,31 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
 
             {/* Quick Preset Buttons */}
             <div className="flex flex-wrap gap-2 pt-1">
-              {PRESET_SHOT_COUNTS.map((item) => (
-                <button
-                  key={item.shots}
-                  type="button"
-                  onClick={() => handleShotsChange(item.shots)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
-                    currentShots === item.shots
-                      ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
-                      : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  {currentShots === item.shots && <Check className="w-3.5 h-3.5" />}
-                </button>
-              ))}
+              {PRESET_SHOT_COUNTS.map((item) => {
+                const isNative = selectedPanoHead.supportedShots?.includes(item.shots);
+                return (
+                  <button
+                    key={item.shots}
+                    type="button"
+                    onClick={() => handleShotsChange(item.shots)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border relative ${
+                      currentShots === item.shots
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                        : isNative
+                        ? 'bg-slate-950 text-amber-300 border-amber-500/40 hover:border-amber-400'
+                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    {isNative && currentShots !== item.shots && (
+                      <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300">
+                        Stop
+                      </span>
+                    )}
+                    {currentShots === item.shots && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Dynamic Results & Stitching Overlap Gauge */}
@@ -358,17 +474,21 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Compass className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-mono font-bold text-slate-300 uppercase">
-                    Resulting Overlap & Safety Rating:
+                  <span className="text-xs font-mono font-bold text-slate-200">
+                    Resulting Overlap:
+                  </span>
+                  <span className="text-sm font-mono font-black text-white">
+                    {liveOverlapPct}%
                   </span>
                 </div>
-                <div className={`px-2.5 py-1 rounded-lg border text-xs font-mono font-bold ${overlapBadgeColor}`}>
-                  {liveOverlapPct}% Overlap
-                </div>
+
+                <span className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${overlapBadgeColor}`}>
+                  {liveOverlapPct >= 25 && liveOverlapPct <= 45 ? 'Optimal Safety' : liveOverlapPct < 25 ? 'Caution: Low' : 'High Overlap'}
+                </span>
               </div>
 
-              {/* Progress bar showing overlap range */}
-              <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden flex border border-slate-800">
+              {/* Progress bar */}
+              <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
                 <div
                   className={`h-full transition-all duration-300 ${
                     liveOverlapPct < 15
@@ -389,7 +509,7 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
 
               {/* Detent Angle Sequence */}
               <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Rotation Detents:</span>
+                <span className="text-slate-500">Rotation Detents ({selectedPanoHead.model}):</span>
                 <span className="font-mono text-amber-400 font-bold">
                   {detentSequence.map((a) => `${a}°`).join(' → ')}
                 </span>
@@ -400,7 +520,7 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
             <form onSubmit={handleSaveRig} className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-800">
               <input
                 type="text"
-                placeholder={`Name this rig (e.g. 'Gazaly — ${selectedCamera.model} + ${selectedLens.model} (${currentShots}S)')`}
+                placeholder={`Name this rig (e.g. 'Gazaly — ${selectedCamera.model} + ${selectedLens.model} + ${selectedPanoHead.model}')`}
                 value={rigName}
                 onChange={(e) => setRigName(e.target.value)}
                 className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -429,7 +549,7 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
                 <Crosshair className="w-4 h-4 text-amber-400" />
-                <span>Panoramic Head Rail Calibration</span>
+                <span>Panoramic Head Calibration</span>
               </h3>
 
               <button
@@ -446,12 +566,16 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
               {/* Upper Rail Card (Dual Units) */}
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-mono text-slate-400 uppercase block">Upper Rail Offset (Entrance Pupil / NPP)</span>
+                  <span className="text-[10px] font-mono text-slate-400 uppercase block">
+                    Upper Rail Offset (Entrance Pupil / NPP)
+                  </span>
                   <span className="text-2xl font-mono font-black text-amber-400 block mt-0.5">
-                    {formatDualMm(nodal.upperRailSettingMm)}
+                    {selectedPanoHead.isRingClamp ? 'Fixed Ring Clamp' : formatDualMm(nodal.upperRailSettingMm)}
                   </span>
                   <span className="text-[11px] text-slate-500 block mt-0.5">
-                    Front index pupil: ~{formatDualMm(selectedLens.entrancePupilOffsetMm || 42)}
+                    {selectedPanoHead.isRingClamp
+                      ? 'NPP is pre-calibrated by lens collar clamp'
+                      : `Front index pupil: ~${formatDualMm(selectedLens.entrancePupilOffsetMm || 42)}`}
                   </span>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
@@ -462,12 +586,16 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
               {/* Lower Rail Card (Dual Units) */}
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-mono text-slate-400 uppercase block">Lower Rail Offset (Sensor Center)</span>
+                  <span className="text-[10px] font-mono text-slate-400 uppercase block">
+                    Lower Rail Offset (Sensor Center)
+                  </span>
                   <span className="text-2xl font-mono font-black text-sky-400 block mt-0.5">
-                    {formatDualMm(nodal.lowerRailSettingMm)}
+                    {selectedPanoHead.isRingClamp ? 'Pre-Centered' : formatDualMm(nodal.lowerRailSettingMm)}
                   </span>
                   <span className="text-[11px] text-slate-500 block mt-0.5">
-                    Centers lens optical axis over rotator axis
+                    {selectedPanoHead.isRingClamp
+                      ? 'Rotates exactly around panning axis'
+                      : 'Centers lens optical axis over rotator axis'}
                   </span>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
@@ -492,10 +620,16 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
               </div>
             </div>
 
+            {nodal.railWarning && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+                {nodal.railWarning}
+              </div>
+            )}
+
             {/* Calibration Checklist */}
             <div className="pt-3 border-t border-slate-800">
               <span className="text-xs font-mono font-bold text-slate-300 uppercase block mb-2">
-                Alignment Guide for {selectedPanoHead.name}
+                Alignment Guide for {selectedPanoHead.brand} {selectedPanoHead.model}
               </span>
               <ul className="flex flex-col gap-2 text-xs text-slate-400">
                 {nodal.alignmentChecklist.map((item, idx) => (
@@ -528,7 +662,8 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
         onClose={() => setIsPdfModalOpen(false)}
         camera={selectedCamera}
         lens={selectedLens}
-        panoHeadName={selectedPanoHead.name}
+        panoHeadName={selectedPanoHead.model}
+        panoHead={selectedPanoHead}
         upperRailMm={nodal.upperRailSettingMm}
         lowerRailMm={nodal.lowerRailSettingMm}
         subjectDistanceM={activeDistance}
