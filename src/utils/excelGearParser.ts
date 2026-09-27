@@ -177,7 +177,7 @@ export function parseExcelGearFile(
             isRingClamp,
             isSlant,
             provenance: {
-              source: isCreatorMode ? 'Gazaly Samsadeen Curated Master Database (Excel)' : 'User Excel Import (Local Device)',
+              source: isCreatorMode ? 'Master Verified Database' : 'User Imported Equipment',
               status: isCreatorMode ? 'MANUFACTURER DATA' : 'USER VERIFIED',
               confidence: 'HIGH',
               dateVerified: new Date().toISOString().split('T')[0],
@@ -237,7 +237,7 @@ export function parseExcelGearFile(
             opticalStabilization: false,
             filterSupport: false,
             provenance: {
-              source: isCreatorMode ? 'Gazaly Samsadeen Master Database (Excel)' : 'User Excel Import (Local Device)',
+              source: isCreatorMode ? 'Master Verified Database' : 'User Imported Equipment',
               status: isCreatorMode ? 'MANUFACTURER DATA' : 'USER VERIFIED',
               confidence: 'HIGH',
               dateVerified: new Date().toISOString().split('T')[0],
@@ -308,7 +308,7 @@ export function parseExcelGearFile(
             remoteTriggerSupport: true,
             lensMount: rawMount,
             provenance: {
-              source: isCreatorMode ? 'Gazaly Samsadeen Master Database (Excel)' : 'User Excel Import (Local Device)',
+              source: isCreatorMode ? 'Master Verified Database' : 'User Imported Equipment',
               status: isCreatorMode ? 'MANUFACTURER DATA' : 'USER VERIFIED',
               confidence: 'HIGH',
               dateVerified: new Date().toISOString().split('T')[0],
