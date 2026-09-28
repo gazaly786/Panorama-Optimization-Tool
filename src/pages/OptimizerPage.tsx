@@ -1325,7 +1325,7 @@ export const OptimizerPage: React.FC<{ onNavigateToSaved?: () => void }> = ({ on
                 <input
                   type="text"
                   required
-                  placeholder={`e.g. Gazaly — ${selectedCamera.model} + ${selectedLens.model}`}
+                  placeholder={`e.g. Master Rig — ${selectedCamera.model} + ${selectedLens.model}`}
                   value={presetName}
                   onChange={(e) => setPresetName(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"

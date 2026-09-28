@@ -589,5 +589,5 @@ export function downloadSampleExcelTemplate(): void {
   XLSX.utils.book_append_sheet(wb, wsLenses, 'Lenses');
   XLSX.utils.book_append_sheet(wb, wsHeads, 'Panoramic Heads');
 
-  XLSX.writeFile(wb, 'PanoOptix_Gear_Database_Template_By_Gazaly_Samsadeen.xlsx');
+  XLSX.writeFile(wb, 'PanoOptix_Gear_Database_Template.xlsx');
 }

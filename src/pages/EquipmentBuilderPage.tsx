@@ -520,7 +520,7 @@ export const EquipmentBuilderPage: React.FC<{ onNavigateToOptimizer: () => void 
             <form onSubmit={handleSaveRig} className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-800">
               <input
                 type="text"
-                placeholder={`Name this rig (e.g. 'Gazaly — ${selectedCamera.model} + ${selectedLens.model} + ${selectedPanoHead.model}')`}
+                placeholder={`Name this rig (e.g. 'Virtual Tour — ${selectedCamera.model} + ${selectedLens.model}')`}
                 value={rigName}
                 onChange={(e) => setRigName(e.target.value)}
                 className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"

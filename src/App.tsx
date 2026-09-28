@@ -75,12 +75,12 @@ const AppContent: React.FC = () => {
           <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
             <span className="font-bold text-slate-300">PanoOptix™ Professional Optical Engine</span>
             <span className="text-slate-600 hidden sm:inline">·</span>
-            <span className="text-amber-400 font-bold bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-              Created by Gazaly Samsadeen
+            <span className="text-slate-400">
+              Created by <strong className="text-slate-300 font-medium">Gazaly Samsadeen</strong>
             </span>
           </div>
           <span className="text-[11px] text-slate-500">
-            Master Optical Database & Field Verification by Gazaly Samsadeen
+            Field Calibrated Panoramic Rig & Optical Optimization Platform
           </span>
         </div>
       </footer>

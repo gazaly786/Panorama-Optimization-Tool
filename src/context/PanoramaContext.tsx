@@ -121,8 +121,8 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_PRESET: UserRigPreset = {
-  id: 'preset-gazaly-canon90d-sigma8mm',
-  name: 'Gazaly — Canon 90D + Sigma 8mm',
+  id: 'preset-reference-canon90d-sigma8mm',
+  name: 'Reference Setup — Canon 90D + Sigma 8mm',
   description: 'Golden reference 360° panorama setup for high quality interior and real estate tours.',
   cameraId: 'canon-90d',
   lensId: 'sigma-8mm-f35-fisheye',

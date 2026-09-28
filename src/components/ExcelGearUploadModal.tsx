@@ -12,7 +12,6 @@ import {
   Camera,
   Layers,
   ShieldCheck,
-  UserCheck,
   Sparkles,
   ArrowRight,
   Info,
@@ -28,7 +27,6 @@ interface ExcelGearUploadModalProps {
 export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOpen, onClose }) => {
   const { cameras, lenses, panoHeads, addCamera, addLens, addPanoHead } = usePanorama();
 
-  const [isCreatorMode, setIsCreatorMode] = useState<boolean>(true); // Gazaly Samsadeen
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [parseResult, setParseResult] = useState<ParseExcelResult | null>(null);
   const [fileName, setFileName] = useState<string>('');
@@ -49,7 +47,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
       try {
         const buffer = e.target?.result as ArrayBuffer;
         if (buffer) {
-          const result = parseExcelGearFile(buffer, cameras, lenses, isCreatorMode, panoHeads);
+          const result = parseExcelGearFile(buffer, cameras, lenses, false, panoHeads);
           setParseResult(result);
         }
       } catch (err: any) {
@@ -139,13 +137,13 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white">Import Equipment Database from Excel</h2>
+                <h2 className="text-base font-bold text-white">Add Camera, Lens or Panoramic Gear</h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
                   .XLSX · .XLS · .CSV
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Upload your cameras, lenses, and panoramic heads spreadsheet. Existing models are automatically skipped.
+                Import custom equipment into your database. Existing models are automatically skipped.
               </p>
             </div>
           </div>
@@ -161,47 +159,34 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
 
         {/* Modal Body */}
         <div className="p-5 overflow-y-auto flex flex-col gap-4">
-          {/* Creator vs Visitor Role Switcher */}
-          <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <UserCheck className="w-4 h-4" />
+          {/* Information & Local Storage Notice */}
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col gap-2.5">
+            <div className="flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
                 <span className="text-xs font-bold text-white block">
-                  {isCreatorMode ? 'Gazaly Samsadeen (App Creator & Lead Architect)' : 'Visitor / Local User Mode'}
+                  Built-in Gear Ready to Use
                 </span>
-                <span className="text-[11px] text-slate-400 block">
-                  {isCreatorMode
-                    ? 'Master Database Mode: Updates global gear database with verified manufacturer data.'
-                    : 'Local Device Mode: Gear is imported into your local browser storage for current PC use only.'}
+                <span className="text-[11px] text-slate-400 block mt-0.5 leading-relaxed">
+                  The app already includes verified cameras, lenses, and panoramic heads out of the box. If your equipment is already listed, you do not need to upload anything!
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0 self-end sm:self-auto">
-              <button
-                type="button"
-                onClick={() => setIsCreatorMode(true)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                  isCreatorMode
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Gazaly (Creator)
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsCreatorMode(false)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                  !isCreatorMode
-                    ? 'bg-sky-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Visitor (Local)
-              </button>
+            <div className="pt-2 border-t border-slate-800/80 flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block">
+                  Custom Equipment Saved to Your Device
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5 leading-relaxed">
+                  When you upload custom gear using this button, the information is saved locally on your computer/browser. You can also export your saved settings file anytime in Section 10 and browse/reload it whenever you return.
+                </span>
+              </div>
             </div>
           </div>
 
@@ -406,7 +391,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2">
                   <CheckCircle className="w-4 h-4" />
                   <span>
-                    Successfully added {parseResult.newCameras.length} cameras, {parseResult.newLenses.length} lenses, and {parseResult.newPanoHeads?.length || 0} panoramic heads to the {isCreatorMode ? 'Master' : 'Local'} database!
+                    Successfully added {parseResult.newCameras.length} cameras, {parseResult.newLenses.length} lenses, and {parseResult.newPanoHeads?.length || 0} panoramic heads to your gear database!
                   </span>
                 </div>
               )}
@@ -416,8 +401,9 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
 
         {/* Modal Footer Actions */}
         <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
-          <div className="text-[11px] text-slate-500">
-            Database Lead: <strong className="text-amber-400">Gazaly Samsadeen</strong>
+          <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Saved to local browser storage</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -436,7 +422,7 @@ export const ExcelGearUploadModal: React.FC<ExcelGearUploadModalProps> = ({ isOp
                 disabled={importSuccess}
                 className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-black transition shadow-lg flex items-center gap-1.5"
               >
-                <span>Confirm & Update Database ({totalNew} items)</span>
+                <span>Save to Gear Database ({totalNew} items)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}

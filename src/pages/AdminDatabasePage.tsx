@@ -392,9 +392,9 @@ export const AdminDatabasePage: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-white">App Creator & Lead Optical Architect: Gazaly Samsadeen</span>
+              <span className="text-sm font-black text-white">Master Equipment Database & Verified Presets</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-400 font-bold">
-                MASTER CURATOR
+                VERIFIED RIGS
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">

@@ -75,7 +75,7 @@ export const LensDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; onN
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition shadow-md"
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>Upload Excel (.xlsx)</span>
+            <span>Add Lens (Import Excel)</span>
           </button>
           <button
             type="button"

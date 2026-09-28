@@ -14,7 +14,6 @@ import {
   ArrowLeftRight,
   Sun,
   Moon,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { usePanorama } from '../context/PanoramaContext';
 

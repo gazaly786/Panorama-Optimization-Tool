@@ -281,7 +281,7 @@ export const FieldSheetPdfModal: React.FC<FieldSheetPdfModalProps> = ({
           {title}
         </h1>
         <p className={`text-[11px] mt-0.5 ${printTheme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>
-          Standard Field Reference Sheet · Created by <strong className="text-amber-600">Gazaly Samsadeen</strong> · Generated {currentDate} {isPage2 ? '(Page 2 of 2)' : ''}
+          Standard Field Reference Sheet · Generated {currentDate} {isPage2 ? '(Page 2 of 2)' : ''}
         </p>
       </div>
 
@@ -662,8 +662,8 @@ export const FieldSheetPdfModal: React.FC<FieldSheetPdfModalProps> = ({
 
       {/* Footer Sign-off */}
       <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-1 text-[9px] text-slate-500 font-mono">
+        <span className="text-[8px] text-slate-400 font-normal">Gazaly Samsadeen</span>
         <span>PanoOptix Optical Verification System · Field Spec ID: #{camera.id.toUpperCase()}-{shotsPerCircle}S</span>
-        <span>Lead Optical Architect: <strong className="text-amber-600">Gazaly Samsadeen</strong></span>
         <span>Photographer Sign-off: __________________________</span>
       </div>
     </>
@@ -836,9 +836,9 @@ export const FieldSheetPdfModal: React.FC<FieldSheetPdfModalProps> = ({
                 {renderCompassDetents()}
 
                 <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                  <span>PanoOptix Optical Verification System</span>
+                  <span className="text-[8px] text-slate-400 font-normal">Gazaly Samsadeen</span>
                   <span>Page 1 of 2 · Equipment Calibration & Alignment</span>
-                  <span>Lead Optical Architect: <strong className="text-amber-600">Gazaly Samsadeen</strong></span>
+                  <span>PanoOptix Optical Verification System</span>
                 </div>
               </div>
 

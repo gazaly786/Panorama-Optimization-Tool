@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePanorama } from '../context/PanoramaContext';
 import { UserRigPreset } from '../types';
+import { ExcelGearUploadModal } from '../components/ExcelGearUploadModal';
 import {
   Bookmark,
   CheckCircle,
@@ -17,6 +18,7 @@ import {
   AlertTriangle,
   X,
   Sliders,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { formatDualMm } from '../utils/units';
 
@@ -44,6 +46,7 @@ export const SavedSetupsPage: React.FC<{ onNavigateToOptimizer: () => void }> = 
 
   const [importJsonText, setImportJsonText] = useState('');
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
 
@@ -149,6 +152,17 @@ export const SavedSetupsPage: React.FC<{ onNavigateToOptimizer: () => void }> = 
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Add Camera or Lens (Import Gear) Button */}
+          <button
+            type="button"
+            onClick={() => setExcelModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold transition shadow-sm"
+            title="Add custom cameras, lenses, or pano heads from Excel (.xlsx) or CSV"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Add Camera or Lens (Import)</span>
+          </button>
+
           {/* Quick Save Current Active Rig */}
           <button
             type="button"
@@ -193,6 +207,36 @@ export const SavedSetupsPage: React.FC<{ onNavigateToOptimizer: () => void }> = 
             <span>Import</span>
           </button>
         </div>
+      </div>
+
+      {/* Equipment Database & Custom Gear Management Banner */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+            <Camera className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">Equipment Database & Custom Gear</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                {cameras.length} Cameras · {lenses.length} Lenses Built-in
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              The app has verified cameras and lenses ready to use. To add your own custom gear, import your Excel or CSV file. All imported gear is saved locally on your computer.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setExcelModalOpen(true)}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shrink-0 shadow-md self-start md:self-auto"
+        >
+          <Plus className="w-4 h-4" />
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>Add Camera or Lens (Excel)</span>
+        </button>
       </div>
 
       {/* Empty State */}
@@ -540,6 +584,12 @@ export const SavedSetupsPage: React.FC<{ onNavigateToOptimizer: () => void }> = 
           </div>
         </div>
       )}
+
+      {/* Equipment Database Excel / CSV Upload Modal */}
+      <ExcelGearUploadModal
+        isOpen={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+      />
     </div>
   );
 };
