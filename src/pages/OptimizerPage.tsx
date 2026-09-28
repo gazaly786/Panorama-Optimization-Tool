@@ -156,78 +156,81 @@ export const OptimizerPage: React.FC<{ onNavigateToSaved?: () => void }> = ({ on
         </div>
       )}
 
-      {/* Top Banner: Workflow Indicator & Mode Switcher */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Left: Workflow Steps */}
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto text-xs font-mono font-bold">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
-            <span>1. CAMERA</span>
+      {/* Top Control Bar: Clear Header, Mode Switcher & Quick Actions */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
+        {/* Left: Clear Section Identity & Live Engine Status */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <Sliders className="w-5 h-5" />
           </div>
-          <span className="text-slate-600">→</span>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
-            <span>2. LENS</span>
-          </div>
-          <span className="text-slate-600">→</span>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
-            <span>3. SCENARIO</span>
-          </div>
-          <span className="text-slate-600">→</span>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
-            <span>4. DISTANCE</span>
-          </div>
-          <span className="text-slate-600">→</span>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
-            <span>5. OPTIMIZED SETTINGS</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                Panorama Field Optimizer
+              </h1>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Live Calculated</span>
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 hidden sm:block">
+              Real-time optics, rotation detents, and parallax calibration for 360° virtual tours
+            </p>
           </div>
         </div>
 
-        {/* Right: Mode Switcher & Quick Save Action */}
-        <div className="flex items-center gap-2.5 self-end md:self-auto flex-wrap">
-          <button
-            type="button"
-            onClick={handleOpenSaveModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-            title="Save this optimized rig configuration to Section 10 (Saved Rigs)"
-          >
-            <Bookmark className="w-3.5 h-3.5 text-amber-400" />
-            <span>Save Rig (Sec. 10)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFieldSheetOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-            title="Open printable & downloadable Field Sheet"
-          >
-            <FileText className="w-3.5 h-3.5 text-sky-400" />
-            <span>Field Sheet (PDF)</span>
-          </button>
-
-          {/* Prominent Mode Toggle: Simple vs Advanced */}
-          <div className="bg-slate-950 p-1 rounded-xl border border-slate-700/80 flex items-center shadow-inner">
+        {/* Right: Properly Arranged & Aligned Controls */}
+        <div className="flex items-center gap-2.5 w-full md:w-auto justify-between md:justify-end flex-wrap sm:flex-nowrap">
+          {/* Mode Switcher (Segmented Control) */}
+          <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center shadow-inner shrink-0">
             <button
               type="button"
               onClick={() => setMode('SIMPLE')}
-              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
                 mode === 'SIMPLE'
                   ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
+              title="Fast, guided setup for beginners"
             >
               <span>🟢 Simple Mode</span>
-              <span className="hidden sm:inline text-[10px] opacity-80">(Beginner)</span>
             </button>
             <button
               type="button"
               onClick={() => setMode('ADVANCED')}
-              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
                 mode === 'ADVANCED'
                   ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
+              title="Full optical physics, DOF, and nodal rail controls"
             >
               <span>⚡ Advanced Mode</span>
-              <span className="hidden sm:inline text-[10px] opacity-80">(Pro)</span>
+            </button>
+          </div>
+
+          <div className="h-6 w-px bg-slate-800 hidden sm:block shrink-0" />
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleOpenSaveModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition"
+              title="Save this optimized rig configuration to Section 10 (Saved Rigs)"
+            >
+              <Bookmark className="w-3.5 h-3.5 text-amber-400" />
+              <span>Save Rig</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFieldSheetOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 transition"
+              title="Open printable & downloadable Field Sheet"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Field Sheet (PDF)</span>
             </button>
           </div>
         </div>
@@ -350,27 +353,18 @@ export const OptimizerPage: React.FC<{ onNavigateToSaved?: () => void }> = ({ on
       {mode === 'SIMPLE' && (
         <div className="flex flex-col gap-6">
           {/* Quick Header Explain */}
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center shrink-0 text-sm">
-                123
-              </div>
-              <div>
-                <h3 className="text-white font-bold text-sm">
-                  Beginner Simple Mode: Fast, Guaranteed 360° Setup
-                </h3>
-                <p className="text-slate-300 text-[11px] mt-0.5">
-                  Select your equipment below. The system automatically calculates your optimal camera dial settings, 4-shot rotation clicks, and panoramic head alignment.
-                </p>
-              </div>
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-xs">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center shrink-0 text-sm">
+              123
             </div>
-            <button
-              type="button"
-              onClick={() => setMode('ADVANCED')}
-              className="text-[11px] font-mono text-amber-400 hover:text-amber-300 font-bold shrink-0 underline transition"
-            >
-              Switch to Advanced Pro Mode →
-            </button>
+            <div>
+              <h3 className="text-white font-bold text-sm">
+                Beginner Simple Mode: Fast, Guaranteed 360° Setup
+              </h3>
+              <p className="text-slate-300 text-[11px] mt-0.5">
+                Select your equipment below. The system automatically calculates your optimal camera dial settings, 4-shot rotation clicks, and panoramic head alignment.
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
