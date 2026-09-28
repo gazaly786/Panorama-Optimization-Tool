@@ -207,7 +207,7 @@ export const NodalPointCalculator: React.FC<NodalPointCalculatorProps> = ({ onAp
               </span>
             </div>
             <div className="text-2xl font-black font-mono text-sky-400 mt-1">
-              {activeUpperRailMark} mm ({ (activeUpperRailMark / 25.4).toFixed(2) } in)
+              {formatDualMm(activeUpperRailMark, 1)}
             </div>
             <p className="text-[11px] text-slate-300 mt-1 font-medium leading-snug">
               Slide upper horizontal rail front index to this etched millimeter mark.
@@ -232,7 +232,7 @@ export const NodalPointCalculator: React.FC<NodalPointCalculatorProps> = ({ onAp
               </span>
             </div>
             <div className="text-2xl font-black font-mono text-emerald-400 mt-1">
-              {result.lowerRailCenteringMm} mm ({ (result.lowerRailCenteringMm / 25.4).toFixed(2) } in)
+              {formatDualMm(result.lowerRailCenteringMm, 1)}
             </div>
             <p className="text-[11px] text-slate-300 mt-1 font-medium leading-snug">
               Centers lens barrel optical axis directly over the rotator panning base pivot.

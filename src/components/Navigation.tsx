@@ -38,7 +38,7 @@ interface NavigationProps {
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ currentPage, onSelectPage, onOpenExcelModal }) => {
-  const { selectedCamera, selectedLens, isDarkMode, toggleTheme } = usePanorama();
+  const { selectedCamera, selectedLens, isDarkMode, toggleTheme, unitPreference, setUnitPreference } = usePanorama();
 
   const navItems: { id: PageId; label: string; icon: React.ReactNode; shortLabel?: string }[] = [
     { id: 'optimizer', label: '1. Optimizer', icon: <Compass className="w-4 h-4" /> },
@@ -83,6 +83,34 @@ export const Navigation: React.FC<NavigationProps> = ({ currentPage, onSelectPag
 
         {/* Right Action Icons */}
         <div className="flex items-center gap-2">
+          {/* Quick Global Unit Switcher */}
+          <div className="bg-slate-900 border border-slate-800 p-0.5 rounded-xl flex items-center shadow-inner">
+            <button
+              type="button"
+              onClick={() => setUnitPreference('metric')}
+              className={`px-2 py-1 rounded-lg text-xs font-mono font-bold transition ${
+                unitPreference === 'metric'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Metric Units (mm / meters)"
+            >
+              mm
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnitPreference('imperial')}
+              className={`px-2 py-1 rounded-lg text-xs font-mono font-bold transition ${
+                unitPreference === 'imperial'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Imperial Units (inches / feet)"
+            >
+              in
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={toggleTheme}

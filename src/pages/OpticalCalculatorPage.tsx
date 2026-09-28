@@ -6,6 +6,7 @@ import { assessDiffraction, calculateAiryDiskUm } from '../calculations/diffract
 import { SliderControl } from '../components/SliderControl';
 import { InfinityFocusSweetSpotGraph } from '../components/InfinityFocusSweetSpotGraph';
 import { ExposureBracketingPanel } from '../components/ExposureBracketingPanel';
+import { formatDualDistance, formatDualMm, formatDualCoC } from '../utils/units';
 import {
   Calculator,
   Eye,
@@ -106,6 +107,7 @@ export const OpticalCalculatorPage: React.FC = () => {
               max={15}
               step={0.1}
               unit="m"
+              displayValueOverride={formatDualDistance(focusDistanceM, 1)}
               onChange={setFocusDistanceM}
               presetValues={[
                 { label: '0.5m', value: 0.5 },
@@ -115,7 +117,7 @@ export const OpticalCalculatorPage: React.FC = () => {
                 { label: `H (${dof.hyperfocalDistanceM}m)`, value: dof.hyperfocalDistanceM },
                 { label: '5m', value: 5.0 },
               ]}
-              helperText={`Near Limit: ${dof.nearLimitM}m · Far Limit: ${dof.farLimitM === 'Infinity' ? '∞' : `${dof.farLimitM}m`}`}
+              helperText={`Near Limit: ${formatDualDistance(dof.nearLimitM, 2)} · Far Limit: ${dof.farLimitM === 'Infinity' ? '∞' : formatDualDistance(dof.farLimitM, 2)}`}
             />
 
             {/* Focal Length Slider */}
@@ -126,6 +128,7 @@ export const OpticalCalculatorPage: React.FC = () => {
               max={Math.max(selectedLens.focalLengthMaxMm, 24)}
               step={1}
               unit="mm"
+              displayValueOverride={formatDualMm(focalLengthMm, 0)}
               onChange={setFocalLengthMm}
               helperText={`Effective full-frame equivalent: ${(focalLengthMm * selectedCamera.cropFactor).toFixed(1)}mm`}
             />
@@ -134,7 +137,7 @@ export const OpticalCalculatorPage: React.FC = () => {
             <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-slate-950 border border-slate-800">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-300 font-medium">Circle of Confusion (CoC):</span>
-                <span className="font-mono text-amber-400 font-bold">{coc.toFixed(4)} mm</span>
+                <span className="font-mono text-amber-400 font-bold">{formatDualCoC(coc)}</span>
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <button
@@ -177,7 +180,7 @@ export const OpticalCalculatorPage: React.FC = () => {
                 <span>Depth of Field Visual Span</span>
               </h3>
               <span className="text-xs font-mono font-bold text-emerald-400">
-                {dof.nearLimitM}m to {dof.farLimitM === 'Infinity' ? '∞ (Infinity)' : `${dof.farLimitM}m`}
+                {formatDualDistance(dof.nearLimitM, 2)} to {dof.farLimitM === 'Infinity' ? '∞ (Infinity)' : formatDualDistance(dof.farLimitM, 2)}
               </span>
             </div>
 

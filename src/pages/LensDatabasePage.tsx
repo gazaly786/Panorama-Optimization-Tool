@@ -3,6 +3,7 @@ import { usePanorama } from '../context/PanoramaContext';
 import { LensSpec, ProjectionType } from '../types';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
 import { ExcelGearUploadModal } from '../components/ExcelGearUploadModal';
+import { formatDualMm, formatDualDistance } from '../utils/units';
 import {
   Layers,
   Search,
@@ -191,11 +192,11 @@ export const LensDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; onN
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase block">Min Focus</span>
-                    <span className="font-bold text-slate-300">{lens.minFocusDistanceM} m</span>
+                    <span className="font-bold text-slate-300">{formatDualDistance(lens.minFocusDistanceM, 2)}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase block">Entrance Pupil</span>
-                    <span className="font-bold text-emerald-400">~{lens.entrancePupilOffsetMm || 45} mm</span>
+                    <span className="font-bold text-emerald-400">{formatDualMm(lens.entrancePupilOffsetMm || 45, 1)}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase block">Mount</span>

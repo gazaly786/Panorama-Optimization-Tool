@@ -3,6 +3,7 @@ import { usePanorama } from '../context/PanoramaContext';
 import { CameraSpec, SensorFormat } from '../types';
 import { ConfidenceBadge } from '../components/ConfidenceBadge';
 import { ExcelGearUploadModal } from '../components/ExcelGearUploadModal';
+import { formatDualDimensions } from '../utils/units';
 import {
   Camera,
   Search,
@@ -178,7 +179,7 @@ export const CameraDatabasePage: React.FC<{ onNavigateToOptimizer: () => void; o
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase block">Sensor Dimensions</span>
-                    <span className="font-bold text-slate-300">{camera.sensorWidthMm} × {camera.sensorHeightMm} mm</span>
+                    <span className="font-bold text-slate-300">{formatDualDimensions(camera.sensorWidthMm, camera.sensorHeightMm)}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase block">AEB Capability</span>

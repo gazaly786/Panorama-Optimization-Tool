@@ -115,6 +115,7 @@ export interface PanoramaScenario {
 export type QualityPriority = 'FAST' | 'BALANCED' | 'MAXIMUM_QUALITY';
 export type PanoramaCoverage = '360x180' | '360_cylindrical' | 'partial_horizontal' | 'custom';
 export type ExposureDialMode = 'M' | 'Tv' | 'Av' | 'P' | 'AUTO_SPORTS';
+export type UnitPreference = 'metric' | 'imperial';
 
 export type PanoHeadType =
   | 'Multi-row Spherical'

@@ -9,7 +9,9 @@ import {
   OpticalCalculationResults,
   PanoramaCoverage,
   ExposureDialMode,
+  UnitPreference,
 } from '../types';
+import { getGlobalUnitPreference, setGlobalUnitPreference } from '../utils/units';
 import { INITIAL_CAMERAS } from '../data/cameras';
 import { INITIAL_LENSES } from '../data/lenses';
 import { INITIAL_PANO_HEADS } from '../data/panoHeads';
@@ -107,6 +109,10 @@ interface PanoramaContextType {
   // Theme
   isDarkMode: boolean;
   toggleTheme: () => void;
+
+  // Global Unit Preference
+  unitPreference: UnitPreference;
+  setUnitPreference: (pref: UnitPreference) => void;
 }
 
 const PanoramaContext = createContext<PanoramaContextType | null>(null);
@@ -252,6 +258,14 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.setItem(STORAGE_KEYS.THEME, next ? 'dark' : 'light');
       return next;
     });
+  };
+
+  // Global Unit Preference (mm vs inches)
+  const [unitPreference, setUnitPreferenceState] = useState<UnitPreference>(() => getGlobalUnitPreference());
+
+  const setUnitPreference = (pref: UnitPreference) => {
+    setUnitPreferenceState(pref);
+    setGlobalUnitPreference(pref);
   };
 
   // Sync to Local Storage
@@ -666,6 +680,8 @@ export const PanoramaProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         importDatabaseJson,
         isDarkMode,
         toggleTheme,
+        unitPreference,
+        setUnitPreference,
       }}
     >
       {children}

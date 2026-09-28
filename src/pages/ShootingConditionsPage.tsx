@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePanorama } from '../context/PanoramaContext';
 import { PanoramaScenario } from '../types';
+import { formatDualDistance } from '../utils/units';
 import {
   SunMedium,
   CheckCircle,
@@ -93,7 +94,7 @@ export const ShootingConditionsPage: React.FC<{ onNavigateToOptimizer: () => voi
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-slate-950/60 p-3 rounded-xl border border-slate-800 mb-4">
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase block">Typical Distance</span>
-                    <span className="font-bold text-slate-200">{sc.defaultSubjectDistanceM} m</span>
+                    <span className="font-bold text-slate-200">{formatDualDistance(sc.defaultSubjectDistanceM, 1)}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase block">Recommended Overlap</span>

@@ -140,14 +140,11 @@ STITCHING MARGIN: GOOD`;
             <span>Focus Distance</span>
             <span className="text-[10px] text-emerald-400 font-bold">Safe Lock</span>
           </div>
-          <div className="text-2xl md:text-3xl font-mono font-black text-emerald-400 mt-1">
-            ~{results.focusDistanceM.toFixed(1)} m
-            <span className="text-xs font-normal text-slate-400 ml-1.5">
-              ({metersToFeet(results.focusDistanceM).toFixed(1)} ft)
-            </span>
+          <div className="text-xl md:text-2xl font-mono font-black text-emerald-400 mt-1">
+            ~{formatDualDistance(results.focusDistanceM, 1)}
           </div>
           <div className="text-[11px] text-slate-400 mt-1 font-mono truncate" title={`DOF: ${formatDualDistance(results.nearLimitM)} → ${formatDualDistance(results.farLimitM)}`}>
-            DOF: {results.nearLimitM}m ({metersToFeet(results.nearLimitM).toFixed(1)}ft) → {results.farLimitM >= 900 ? '∞' : `${results.farLimitM}m`}
+            DOF: {formatDualDistance(results.nearLimitM, 1)} → {results.farLimitM >= 900 ? '∞' : formatDualDistance(results.farLimitM, 1)}
           </div>
         </div>
 
